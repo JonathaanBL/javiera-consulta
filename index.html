@@ -105,6 +105,16 @@ th:first-child,td:first-child{text-align:left}
 th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
 
 .chart svg{width:100%;height:auto;display:block}
+.mealgrid th,.mealgrid td{white-space:normal;padding:8px 4px;text-align:center}
+.mealgrid th:first-child,.mealgrid td:first-child{min-width:140px;text-align:left}
+.mealgrid input{width:52px!important}
+label.check{display:flex;gap:10px;align-items:center;grid-column:1/-1;font-size:.95rem;color:var(--ink)}
+label.check input{width:22px;height:22px}
+.meal ul{list-style:none;display:grid;gap:10px;margin-top:8px}
+.meal li{display:grid;gap:2px;padding-left:14px;border-left:3px solid var(--lime)}
+.meal li .muted{font-size:.9rem}
+.bul{margin:8px 0 0 20px;display:grid;gap:4px}
+@media print{.meal,.bul{break-inside:avoid}}
 .chart select{width:auto;margin-bottom:12px}
 
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));translate:-50% 0;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:999px;font-weight:600;z-index:20;transition:opacity .3s}
@@ -145,8 +155,21 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = fal
 const KEY = 'consulta-v1';
 let db = load();
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.patients)) return d; } catch {}
-  return { patients: [], foods: FOODS_SEED(), lastBackup: null };
+  let d;
+  try { d = JSON.parse(localStorage.getItem(KEY)); } catch {}
+  if (!d || !Array.isArray(d.patients)) d = { patients: [], foods: [], lastBackup: null };
+  return migrate(d);
+}
+function migrate(d) {
+  // cada versión agrega alimentos y grupos nuevos sin pisar lo que Javiera ya editó
+  if ((d.seed || 0) < 2) {
+    const names = new Set(d.foods.map(f => f.name));
+    d.foods.push(...FOODS_SEED().filter(f => !names.has(f.name)));
+    d.groups ||= GROUPS_SEED();
+    d.seed = 2;
+  }
+  if (d.seed < 3) { for (const g of d.groups) g.exBudget ??= BUDGET_EX()[g.id] || ''; d.seed = 3; }
+  return d;
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
@@ -222,8 +245,99 @@ function FOODS_SEED() {
     ['Almendras', 579, 21, 22, 50], ['Maní', 567, 26, 16, 49], ['Mantequilla de maní', 588, 25, 20, 50],
     ['Plátano', 89, 1.1, 23, .3], ['Manzana', 52, .3, 14, .2], ['Naranja', 47, .9, 12, .1], ['Frutillas', 32, .7, 7.7, .3],
     ['Tomate', 18, .9, 3.9, .2], ['Lechuga', 15, 1.4, 2.9, .2], ['Zanahoria', 41, .9, 9.6, .2], ['Brócoli', 34, 2.8, 6.6, .4],
-    ['Azúcar', 387, 0, 100, 0]
+    ['Azúcar', 387, 0, 100, 0],
+    // panes, cereales y tubérculos
+    ['Hallulla', 290, 8, 55, 4], ['Pan pita', 275, 9, 56, 1.2], ['Tortilla de trigo', 310, 8, 50, 8],
+    ['Arroz integral cocido', 112, 2.3, 24, .8], ['Quinoa cocida', 120, 4.4, 21, 1.9], ['Fideos integrales cocidos', 149, 6, 30, 1.7],
+    ['Choclo cocido', 96, 3.4, 21, 1.5], ['Camote cocido', 90, 2, 21, .2], ['Galletas de agua', 430, 9, 72, 11],
+    ['Granola', 471, 10, 64, 20], ['Cereal de maíz (corn flakes)', 357, 7.5, 84, .4], ['Harina de trigo', 364, 10, 76, 1],
+    ['Papas fritas caseras', 312, 3.4, 41, 15], ['Puré de papas', 83, 2, 17, 1],
+    // legumbres
+    ['Arvejas cocidas', 84, 5.4, 15.6, .2], ['Habas cocidas', 110, 7.6, 19.7, .4], ['Porotos negros cocidos', 132, 8.9, 23.7, .5],
+    // carnes, pescados y huevos
+    ['Trutro de pollo sin piel cocido', 209, 26, 0, 10.9], ['Pechuga de pavo cocida', 135, 30, 0, 1], ['Carne molida 10 % grasa cocida', 217, 26, 0, 12],
+    ['Lomo vetado cocido', 290, 24, 0, 21], ['Posta negra cocida', 190, 30, 0, 7], ['Lomo de cerdo cocido', 200, 27, 0, 9],
+    ['Jamón de pavo', 104, 17, 2, 3], ['Jamón de cerdo', 145, 21, 1.5, 6], ['Vienesa', 290, 11, 3, 26],
+    ['Merluza cocida', 90, 19, 0, 1.3], ['Jurel en lata', 170, 21, 0, 9], ['Sardinas en aceite', 208, 24.6, 0, 11.5],
+    ['Camarones cocidos', 99, 24, .2, .3], ['Clara de huevo', 52, 10.9, .7, .2], ['Tofu', 76, 8, 1.9, 4.8],
+    // lácteos
+    ['Leche semidescremada', 46, 3.3, 4.8, 1.5], ['Yogur descremado', 56, 5.7, 7.7, .2], ['Yogur griego natural', 97, 9, 3.9, 5],
+    ['Yogur batido azucarado', 95, 3.5, 16, 1.8], ['Queso cottage', 98, 11, 3.4, 4.3], ['Queso mozzarella', 280, 28, 3, 17],
+    ['Queso parmesano', 431, 38, 4, 29], ['Leche en polvo descremada', 362, 36, 52, .8], ['Bebida vegetal de almendra', 15, .6, .3, 1.2],
+    // grasas y alimentos ricos en lípidos
+    ['Mantequilla', 717, .9, .1, 81], ['Margarina', 717, .2, .7, 80], ['Mayonesa', 680, 1, .6, 75], ['Aceite vegetal (maravilla, canola)', 884, 0, 0, 100],
+    ['Nueces', 654, 15, 14, 65], ['Aceitunas', 115, .8, 6, 11], ['Semillas de chía', 486, 17, 42, 31], ['Linaza', 534, 18, 29, 42],
+    ['Pistachos', 560, 20, 28, 45], ['Coco rallado', 660, 7, 24, 65],
+    // frutas
+    ['Pera', 57, .4, 15, .1], ['Durazno', 39, .9, 10, .3], ['Uva', 69, .7, 18, .2], ['Kiwi', 61, 1.1, 15, .5], ['Mandarina', 53, .8, 13, .3],
+    ['Sandía', 30, .6, 7.6, .2], ['Melón', 34, .8, 8, .2], ['Piña', 50, .5, 13, .1], ['Arándanos', 57, .7, 14, .3], ['Frambuesas', 52, 1.2, 12, .7],
+    ['Ciruela', 46, .7, 11, .3], ['Damasco', 48, 1.4, 11, .4], ['Cerezas', 63, 1.1, 16, .2], ['Mango', 60, .8, 15, .4], ['Chirimoya', 75, 1.6, 18, .7],
+    ['Pasas', 299, 3.1, 79, .5], ['Limón', 29, 1.1, 9, .3],
+    // verduras
+    ['Espinaca', 23, 2.9, 3.6, .4], ['Pepino', 15, .7, 3.6, .1], ['Zapallo italiano', 17, 1.2, 3.1, .3], ['Zapallo', 26, 1, 6.5, .1],
+    ['Betarraga cocida', 44, 1.7, 10, .2], ['Cebolla', 40, 1.1, 9.3, .1], ['Pimentón', 31, 1, 6, .3], ['Coliflor', 25, 1.9, 5, .3],
+    ['Repollo', 25, 1.3, 5.8, .1], ['Champiñones', 22, 3.1, 3.3, .3], ['Apio', 16, .7, 3, .2], ['Acelga', 19, 1.8, 3.7, .2], ['Porotos verdes', 31, 1.8, 7, .2],
+    // otros
+    ['Miel', 304, .3, 82, 0], ['Mermelada', 278, .4, 69, .1], ['Chocolate amargo 70 %', 598, 7.8, 46, 43], ['Manjar', 315, 7, 55, 7.5],
+    ['Proteína whey (polvo)', 400, 80, 8, 6], ['Barra de cereal', 400, 6, 72, 10], ['Bebida azucarada', 42, 0, 10.6, 0], ['Jugo de naranja', 45, .7, 10, .2],
+    ['Papas fritas de paquete', 536, 7, 53, 34], ['Pizza', 266, 11, 33, 10], ['Cerveza', 43, .5, 3.6, 0], ['Vino tinto', 85, .1, 2.6, 0]
   ].map(([name, kcal, p, c, g]) => ({ id: uid(), name, kcal, p, c, g }));
+}
+
+// ---------- pauta alimentaria por porciones de intercambio ----------
+// Grupos de intercambio usados en Chile (referencia INTA): kcal, proteínas, carbohidratos y grasas por porción.
+// Los ejemplos son orientativos; Javiera los edita en Alimentos → Grupos de intercambio.
+function GROUPS_SEED() {
+  return [
+    ['cereales', 'Cereales, papas y leguminosas frescas', 140, 3, 30, 1, '½ marraqueta · ¾ taza de arroz o fideos cocidos · 1 papa mediana · ½ taza de avena · 1 choclo chico'],
+    ['leguminosas', 'Leguminosas', 170, 11, 30, 1, '¾ taza de porotos, lentejas o garbanzos cocidos'],
+    ['verdurasG', 'Verduras de consumo general', 30, 2, 5, 0, '1 taza de zanahoria, betarraga, zapallo italiano, brócoli, coliflor o porotos verdes'],
+    ['verdurasL', 'Verduras de libre consumo', 10, 1, 2, 0, 'Lechuga, tomate, pepino, apio, repollo, acelga, espinaca, pimentón'],
+    ['frutas', 'Frutas', 65, 1, 15, 0, '1 manzana, pera o naranja chica · 1 plátano chico · 1 taza de frutillas o melón · 2 kiwis · 15 uvas'],
+    ['carnesBG', 'Carnes bajas en grasa', 65, 11, 0, 2, '50 g de pollo o pavo sin piel · 50 g de pescado blanco · ⅓ lata de atún en agua · 3 claras'],
+    ['carnesAG', 'Carnes altas en grasa', 120, 11, 0, 8, '1 huevo · 50 g de vacuno o cerdo · 50 g de salmón · 2 rebanadas de jamón'],
+    ['lacteosAG', 'Lácteos altos en grasa', 110, 5, 9, 6, '1 taza de leche entera · 1 yogur natural entero'],
+    ['lacteosMG', 'Lácteos medios en grasa', 85, 5, 9, 3, '1 taza de leche semidescremada · 1 yogur semidescremado'],
+    ['lacteosBG', 'Lácteos bajos en grasa', 70, 7, 10, 0, '1 taza de leche descremada · 1 yogur descremado · 1 rebanada gruesa de quesillo'],
+    ['aceites', 'Aceites y grasas', 180, 0, 0, 20, '4 cucharaditas de aceite · 4 cucharaditas de mantequilla o mayonesa'],
+    ['lipidos', 'Alimentos ricos en lípidos', 175, 5, 5, 15, '⅓ palta mediana · 25 g de frutos secos (almendras, nueces, maní) · 2 cucharadas de semillas'],
+    ['azucares', 'Azúcares', 20, 0, 5, 0, '1 cucharadita de azúcar, miel o mermelada']
+  ].map(([id, name, kcal, p, c, g, ex]) => ({ id, name, kcal, p, c, g, ex, exBudget: BUDGET_EX()[id] }));
+}
+// Ejemplos de bajo costo por grupo, para pautas económicas (función: se usa al cargar, antes que cualquier const de más abajo)
+function BUDGET_EX() { return {
+  cereales: '¾ taza de arroz o fideos cocidos · 1 papa mediana · ½ taza de avena a granel · ½ marraqueta',
+  leguminosas: '¾ taza de porotos, lentejas o garbanzos cocidos (comprados secos, a granel)',
+  verdurasG: '1 taza de zanahoria, zapallo, betarraga o repollo de temporada, de la feria',
+  verdurasL: 'Lechuga, repollo, tomate o pepino de temporada, de la feria',
+  frutas: '1 manzana, naranja o plátano chico · fruta de temporada de la feria',
+  carnesBG: '⅓ lata de jurel o atún en agua · 50 g de pollo sin piel (pollo entero o trutro) · 3 claras',
+  carnesAG: '1 huevo · 50 g de carne molida · 50 g de trutro con piel',
+  lacteosAG: '1 taza de leche entera (también en polvo: 3 cucharadas en 1 taza de agua)',
+  lacteosMG: '1 taza de leche semidescremada · 1 yogur de pote grande servido en taza',
+  lacteosBG: '1 taza de leche descremada (también en polvo) · 1 yogur descremado de pote grande servido en taza',
+  aceites: '4 cucharaditas de aceite vegetal (maravilla o canola)',
+  lipidos: '25 g de maní sin sal · ⅓ palta de temporada',
+  azucares: '1 cucharadita de azúcar o mermelada'
+}; }
+const MEALS = [['desayuno', 'Desayuno'], ['col1', 'Colación AM'], ['almuerzo', 'Almuerzo'], ['col2', 'Colación PM / pre-entreno'], ['once', 'Once'], ['cena', 'Cena']];
+const GOALS = [[-.2, 'Bajar grasa (−20 %)'], [-.15, 'Bajar grasa (−15 %)'], [-.1, 'Bajar grasa suave (−10 %)'], [0, 'Mantener peso'], [.1, 'Ganar masa (+10 %)'], [.15, 'Ganar masa (+15 %)']];
+
+function newPlan(p) {
+  const prev = (p.plans || []).at(-1);
+  return prev ? { ...structuredClone(prev), id: uid(), date: today() }
+    : { id: uid(), date: today(), adjust: 0, kcalManual: null, protKg: 1.6, fatPct: 25, portions: {}, meals: {}, prefer: '', avoid: '', activity: '', notes: '', showKcal: true };
+}
+function targets(p, plan) {
+  const c = sorted(p).at(-1), r = c ? results(p, c) : {}, w = c?.weight;
+  const kcal = plan.kcalManual || (r.tdee ? r.tdee * (1 + (plan.adjust || 0)) : null);
+  const P = w && plan.protKg ? plan.protKg * w : null, G = kcal && plan.fatPct ? kcal * plan.fatPct / 900 : null;
+  return { tdee: r.tdee, w, kcal, P, G, C: kcal && P != null && G != null ? (kcal - P * 4 - G * 9) / 4 : null };
+}
+function totals(portions) {
+  const t = { kcal: 0, p: 0, c: 0, g: 0 };
+  for (const gr of db.groups) { const n = portions?.[gr.id] || 0; for (const k in t) t[k] += n * gr[k]; }
+  return t;
 }
 
 // ---------- gráfico de evolución (SVG) ----------
@@ -311,7 +425,7 @@ function vPatient(p) {
   const age = ageAt(p.birth, today());
   return `<div class="head"><div><h1>${esc(p.name)}</h1>
       <p class="muted">${[p.sex === 'M' ? 'Masculino' : 'Femenino', age != null ? age + ' años' : null, p.sport, p.phone].filter(Boolean).map(esc).join(' · ')}</p></div>
-    <div class="actions"><a class="btn" href="#/p/${p.id}/control">+ Nuevo control</a><a class="btn ghost" href="#/p/${p.id}/informe">Informe</a><a class="btn ghost" href="#/p/${p.id}/editar">Editar</a></div></div>
+    <div class="actions"><a class="btn" href="#/p/${p.id}/control">+ Nuevo control</a><a class="btn lime" href="#/p/${p.id}/pauta">+ Nueva pauta</a><a class="btn ghost" href="#/p/${p.id}/informe">Informe</a><a class="btn ghost" href="#/p/${p.id}/editar">Editar</a></div></div>
   ${p.goal || p.notes ? `<div class="card">${p.goal ? `<p><b>Objetivo:</b> ${esc(p.goal)}</p>` : ''}${p.notes ? `<p class="muted" style="margin-top:6px;white-space:pre-wrap">${esc(p.notes)}</p>` : ''}</div>` : ''}
   ${c ? `<section><p class="muted" style="margin-bottom:10px">Último control: ${fdate(c.date)}${prev ? ` · comparado con ${fdate(prev.date)}` : ''}</p>
     <div class="tiles">
@@ -330,7 +444,12 @@ function vPatient(p) {
     <thead><tr><th>Fecha</th><th>Peso kg</th><th>IMC</th><th>% grasa</th><th>Cintura cm</th><th>Σ6 mm</th><th></th></tr></thead>
     <tbody>${[...cs].reverse().map(x => { const rx = results(p, x); return `<tr><td>${fdate(x.date)}</td><td>${fmt(x.weight)}</td><td>${fmt(rx.imc)}</td><td>${fmt(rx.fat)}</td><td>${fmt(x.circ?.cintura)}</td><td>${fmt(rx.sum6)}</td><td><a class="btn sm ghost" href="#/p/${p.id}/control/${x.id}">Ver / editar</a></td></tr>`; }).join('')}</tbody>
   </table></div></section>`
-  : `<div class="empty">Todavía no hay controles. Registra el primero con «Nuevo control».</div>`}`;
+  : `<div class="empty">Todavía no hay controles. Registra el primero con «Nuevo control».</div>`}
+  ${p.plans?.length ? `<section class="card"><h2>Pautas</h2><div class="tablewrap"><table>
+    <thead><tr><th>Fecha</th><th>kcal aprox.</th><th></th></tr></thead>
+    <tbody>${[...p.plans].reverse().map(x => `<tr><td>${fdate(x.date)}</td><td>${fmt(totals(x.portions).kcal, 0)}</td>
+      <td><a class="btn sm ghost" href="#/p/${p.id}/pauta/${x.id}/ver">Ver</a> <a class="btn sm ghost" href="#/p/${p.id}/pauta/${x.id}">Editar</a></td></tr>`).join('')}</tbody>
+  </table></div><p class="hint" style="margin-top:8px">«Nueva pauta» parte como copia de la última, para ajustarla en cada control.</p></section>` : ''}`;
 }
 
 function field(group, key, label, unit, val) {
@@ -436,6 +555,17 @@ function vFoods() {
     </div>
     <div class="actions"><button class="btn">Guardar alimento</button><button type="reset" class="btn ghost" data-action="resetFood">Limpiar</button>
       <button type="button" class="btn danger" data-action="delFood" hidden>Eliminar</button></div>
+  </form>
+  <form class="card" id="fGroups"><h2>Grupos de intercambio</h2>
+    <p class="hint" style="margin-bottom:12px">Valores por porción que usa el armador de pautas (referencia INTA). Ajústalos y los ejemplos a tu forma de trabajar.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Grupo</th><th>kcal</th><th>Prot. g</th><th>Carb. g</th><th>Grasa g</th><th style="text-align:left">Ejemplos de 1 porción</th></tr></thead>
+      <tbody>${db.groups.map(g => `<tr><td style="white-space:normal;min-width:150px">${esc(g.name)}</td>
+        ${['kcal', 'p', 'c', 'g'].map(k => `<td><input name="${g.id}.${k}" inputmode="decimal" value="${g[k]}" style="width:64px;padding:6px;text-align:right" aria-label="${k} de ${esc(g.name)}"></td>`).join('')}
+        <td style="white-space:normal;min-width:260px;display:grid;gap:6px"><textarea name="${g.id}.ex" style="min-height:60px" aria-label="Ejemplos de ${esc(g.name)}">${esc(g.ex)}</textarea>
+          <label>Ejemplos económicos<textarea name="${g.id}.exBudget" style="min-height:60px">${esc(g.exBudget)}</textarea></label></td></tr>`).join('')}</tbody>
+    </table></div>
+    <div class="actions"><button class="btn">Guardar grupos</button></div>
   </form>`;
 }
 
@@ -454,10 +584,122 @@ function vBackup() {
   </div>`;
 }
 
+function vPlan(p, plan) {
+  const saved = (p.plans || []).some(x => x.id === plan.id);
+  return `<div class="head"><div><h1>Pauta alimentaria</h1><p class="muted">${esc(p.name)}</p></div><a class="btn ghost" href="#/p/${p.id}">← Volver</a></div>
+  <form id="fPlan" style="display:grid;gap:20px">
+    <section class="card"><h2>1 · Meta de calorías y macronutrientes</h2>
+      <div class="grid">
+        <label>Fecha<input type="date" name="date" value="${plan.date}" required></label>
+        <label>Objetivo<select name="adjust">${GOALS.map(([v, l]) => `<option value="${v}" ${v == plan.adjust ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>kcal fijas <span class="u">(opcional)</span><input name="kcalManual" inputmode="decimal" value="${plan.kcalManual ?? ''}" placeholder="Usa el gasto calculado"></label>
+        <label>Proteínas <span class="u">(g/kg)</span><input name="protKg" inputmode="decimal" value="${plan.protKg ?? ''}"></label>
+        <label>Grasas <span class="u">(% de kcal)</span><input name="fatPct" inputmode="decimal" value="${plan.fatPct ?? ''}"></label>
+      </div>
+      <div id="tgt" style="margin-top:14px"></div>
+    </section>
+    <section class="card"><h2>2 · Porciones del día</h2>
+      <div class="tablewrap"><table><thead><tr><th>Grupo</th><th>kcal por porción</th><th>Porciones</th></tr></thead>
+      <tbody>${db.groups.map(g => `<tr><td>${esc(g.name)}</td><td>${fmt(g.kcal, 0)}</td><td><input name="portions.${g.id}" inputmode="decimal" value="${plan.portions[g.id] ?? ''}" style="width:76px;padding:6px 8px;text-align:right" aria-label="Porciones de ${esc(g.name)}"></td></tr>`).join('')}</tbody></table></div>
+      <div id="tot" style="margin-top:14px"></div>
+    </section>
+    <section class="card"><h2>3 · Reparto por comida</h2><p class="hint" style="margin-bottom:10px">Reparte las porciones de cada grupo entre las comidas. Se aceptan medias porciones (0,5).</p><div id="meals"></div></section>
+    <section class="card"><h2>4 · Indicaciones</h2><div class="grid">
+      <label style="grid-column:1/-1">Preferir <span class="u">(una por línea)</span><textarea name="prefer" placeholder="Pan integral&#10;Pescado 2 veces por semana">${esc(plan.prefer)}</textarea></label>
+      <label style="grid-column:1/-1">Evitar o limitar <span class="u">(una por línea)</span><textarea name="avoid" placeholder="Bebidas azucaradas&#10;Frituras">${esc(plan.avoid)}</textarea></label>
+      <label style="grid-column:1/-1">Actividad física y entrenamiento<textarea name="activity" placeholder="Ej: colación PM 1 a 2 horas antes de entrenar. Después de entrenar, la once o la cena dentro de 2 horas.">${esc(plan.activity)}</textarea></label>
+      <label style="grid-column:1/-1">Otras indicaciones<textarea name="notes">${esc(plan.notes)}</textarea></label>
+      <label class="check"><input type="checkbox" name="showKcal" ${plan.showKcal ? 'checked' : ''}> Mostrar las calorías en la pauta del paciente</label>
+      <label class="check"><input type="checkbox" name="budget" ${plan.budget ? 'checked' : ''}> Pauta económica (los ejemplos muestran alimentos de bajo costo)</label>
+    </div></section>
+    <div class="actions"><button class="btn">Guardar y ver pauta</button><a class="btn ghost" href="#/p/${p.id}">Cancelar</a>
+      ${saved ? '<button type="button" class="btn danger" data-action="delPlan">Eliminar pauta</button>' : ''}</div>
+  </form>`;
+}
+
+function readPlan(form, base) {
+  const plan = { ...base, portions: {}, meals: {} };
+  for (const [k, v] of new FormData(form)) {
+    const [a, b, c] = k.split('.');
+    if (a === 'portions') { const n = num(v); if (n) plan.portions[b] = n; }
+    else if (a === 'meals') { const n = num(v); if (n) (plan.meals[b] ||= {})[c] = n; }
+    else if (['date', 'prefer', 'avoid', 'activity', 'notes'].includes(a)) plan[a] = v;
+    else if (a !== 'showKcal' && a !== 'budget') plan[a] = num(v);
+  }
+  plan.showKcal = form.elements.showKcal.checked;
+  plan.budget = form.elements.budget.checked;
+  return plan;
+}
+
+function targetsHtml(p, plan) {
+  const t = targets(p, plan);
+  if (!t.kcal) return '<p class="muted">Registra un control con peso y talla (y la fecha de nacimiento del paciente) para calcular el gasto, o escribe las kcal fijas.</p>';
+  const pk = x => t.w && x != null ? ` · ${fmt(x / t.w)} g/kg` : '';
+  const pct = x => x != null ? fmt(x / t.kcal * 100, 0) + ' %' : '';
+  return `<div class="tiles">
+    <div class="tile"><small>Meta diaria</small><strong>${fmt(t.kcal, 0)}</strong><em>kcal${t.tdee && !plan.kcalManual ? ' · gasto ' + fmt(t.tdee, 0) : ''}</em></div>
+    <div class="tile"><small>Proteínas</small><strong>${fmt(t.P, 0)} g</strong><em>${pct(t.P * 4)}${pk(t.P)}</em></div>
+    <div class="tile"><small>Grasas</small><strong>${fmt(t.G, 0)} g</strong><em>${pct(t.G * 9)}${pk(t.G)}</em></div>
+    <div class="tile"><small>Carbohidratos</small><strong>${fmt(t.C, 0)} g</strong><em>${pct(t.C * 4)}${pk(t.C)}</em></div>
+  </div>${t.C != null && t.C < 0 ? '<p class="chip warn" style="margin-top:8px">Proteínas y grasas superan la meta de calorías: baja alguna.</p>' : ''}`;
+}
+
+function totalsHtml(p, plan) {
+  const t = targets(p, plan), s = totals(plan.portions);
+  const tile = (label, a, goal, u) => {
+    const q = goal > 0 ? Math.round(a / goal * 100) : null, ok = q != null && q >= 90 && q <= 110;
+    return `<div class="tile"><small>${label}</small><strong>${fmt(a, 0)} ${u}</strong>${q != null ? `<span class="chip ${ok ? '' : 'warn'}">${q} % de la meta</span>` : ''}</div>`;
+  };
+  return `<div class="tiles">${tile('Calorías', s.kcal, t.kcal, 'kcal')}${tile('Proteínas', s.p, t.P, 'g')}${tile('Carbohidratos', s.c, t.C, 'g')}${tile('Grasas', s.g, t.G, 'g')}</div>
+    <p class="hint" style="margin-top:8px">Lo ideal es quedar entre 90 % y 110 % de la meta.</p>`;
+}
+
+function mealsHtml(plan) {
+  const gs = db.groups.filter(g => plan.portions[g.id]);
+  if (!gs.length) return '<p class="muted">Primero indica las porciones del día.</p>';
+  return `<div class="tablewrap"><table class="mealgrid"><thead><tr><th>Grupo</th>${MEALS.map(([, l]) => `<th>${l.split(' / ')[0]}</th>`).join('')}<th>Repartidas</th></tr></thead><tbody>
+    ${gs.map(g => `<tr><td>${esc(g.name)}</td>${MEALS.map(([m, l]) => `<td><input name="meals.${m}.${g.id}" inputmode="decimal" value="${plan.meals[m]?.[g.id] ?? ''}" style="width:56px;padding:6px;text-align:right" aria-label="${esc(g.name)}, ${l}"></td>`).join('')}<td data-assigned="${g.id}"></td></tr>`).join('')}
+    <tr><th>kcal por comida</th>${MEALS.map(([m]) => `<td data-mealkcal="${m}"></td>`).join('')}<td></td></tr>
+  </tbody></table></div>`;
+}
+
+function updatePlanUI(p, plan) {
+  $('#tgt').innerHTML = targetsHtml(p, plan);
+  $('#tot').innerHTML = totalsHtml(p, plan);
+  for (const g of db.groups) {
+    const el = app.querySelector(`[data-assigned="${g.id}"]`); if (!el) continue;
+    const got = MEALS.reduce((s, [m]) => s + (plan.meals[m]?.[g.id] || 0), 0), want = plan.portions[g.id] || 0;
+    el.innerHTML = `<span class="chip ${Math.abs(got - want) < .01 ? '' : 'warn'}">${fmt(got)} de ${fmt(want)}</span>`;
+  }
+  for (const [m] of MEALS) { const el = app.querySelector(`[data-mealkcal="${m}"]`); if (el) el.textContent = fmt(totals(plan.meals[m]).kcal, 0); }
+}
+
+function vPlanPrint(p, plan) {
+  const w = sorted(p).at(-1)?.weight;
+  const lines = s => (s || '').split('\n').map(x => x.trim()).filter(Boolean);
+  const list = (title, s) => lines(s).length ? `<div><h2>${title}</h2><ul class="bul">${lines(s).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+  const meals = MEALS.filter(([m]) => Object.keys(plan.meals[m] || {}).length);
+  return `<div class="head noprint"><a class="btn ghost" href="#/p/${p.id}">← Volver</a>
+    <div class="actions"><a class="btn ghost" href="#/p/${p.id}/pauta/${plan.id}">Editar</a><button class="btn" data-action="print">Imprimir o guardar PDF</button></div></div>
+  <article class="card" style="display:grid;gap:22px">
+    <div><p class="muted">Nta. Javiera · Nutrición deportiva</p><h1>Tu pauta alimentaria</h1>
+      <p>${esc(p.name)} · ${fdate(plan.date)}${plan.showKcal ? ` · ${fmt(totals(plan.portions).kcal, 0)} kcal aprox. al día` : ''}</p></div>
+    ${meals.length ? meals.map(([m, l]) => `<div class="meal"><h2>${l}</h2><ul>${Object.entries(plan.meals[m]).map(([gid, n]) => {
+      const g = db.groups.find(x => x.id === gid);
+      return g ? `<li><b>${fmt(n)} ${n <= 1 ? 'porción' : 'porciones'} de ${esc(g.name.toLowerCase())}</b><span class="muted">${esc(plan.budget && g.exBudget ? g.exBudget : g.ex)}</span></li>` : '';
+    }).join('')}</ul></div>`).join('') : '<p class="muted noprint">Esta pauta aún no tiene porciones repartidas por comida.</p>'}
+    ${list('Preferir', plan.prefer)}${list('Evitar o limitar', plan.avoid)}
+    ${w ? `<div><h2>Hidratación</h2><p>Alrededor de ${fmt(w * .035)} litros de agua al día, y más los días que entrenas o hace calor.</p></div>` : ''}
+    ${plan.activity ? `<div><h2>Actividad física y entrenamiento</h2><p style="white-space:pre-wrap">${esc(plan.activity)}</p></div>` : ''}
+    ${plan.notes ? `<div><h2>Otras indicaciones</h2><p style="white-space:pre-wrap">${esc(plan.notes)}</p></div>` : ''}
+  </article>`;
+}
+
 // ---------- enrutador ----------
 function route() {
-  const [, a, id, b, cid] = (location.hash || '#/').slice(1).split('/');
+  const [, a, id, b, cid, sub] = (location.hash || '#/').slice(1).split('/');
   const p = a === 'p' ? patient(id) : null;
+  const plan = p && b === 'pauta' && cid ? (p.plans || []).find(x => x.id === cid) : null;
   let html;
   if (a === 'nuevo') html = vPatientForm();
   else if (a === 'alimentos') html = vFoods();
@@ -465,11 +707,22 @@ function route() {
   else if (p && b === 'editar') html = vPatientForm(p);
   else if (p && b === 'control') html = vControl(p, cid ? p.controls.find(c => c.id === cid) : null);
   else if (p && b === 'informe') html = vReport(p);
+  else if (plan && sub === 'ver') html = vPlanPrint(p, plan);
+  else if (p && b === 'pauta') { ui.plan = plan ? structuredClone(plan) : newPlan(p); html = vPlan(p, ui.plan); }
   else if (p) html = vPatient(p);
   else html = vList();
   app.innerHTML = html;
   document.querySelectorAll('.tabs a').forEach(t => t.toggleAttribute('aria-current', t.dataset.tab === (a === 'alimentos' || a === 'respaldo' ? a : 'p')));
   if (p && b === 'control') { const f = $('#fControl'); const upd = () => $('#live').innerHTML = liveResults(p, readControl(f)); f.addEventListener('input', upd); upd(); }
+  const fp = $('#fPlan');
+  if (fp) {
+    $('#meals').innerHTML = mealsHtml(ui.plan); updatePlanUI(p, ui.plan);
+    fp.addEventListener('input', e => {
+      ui.plan = readPlan(fp, ui.plan);
+      if (e.target.name?.startsWith('portions.')) $('#meals').innerHTML = mealsHtml(ui.plan); // los grupos del reparto siguen a las porciones
+      updatePlanUI(p, ui.plan);
+    });
+  }
   scrollTo(0, 0);
 }
 addEventListener('hashchange', route);
@@ -508,6 +761,24 @@ app.addEventListener('submit', e => {
     if (old) Object.assign(old, c); else p.controls.push({ id: uid(), ...c });
     if (save()) { toast('Control guardado'); location.hash = '#/p/' + p.id; }
   }
+  if (f.id === 'fPlan') {
+    const p = patient(id), plan = readPlan(f, ui.plan);
+    if (!plan.date) return toast('Falta la fecha');
+    p.plans ||= [];
+    const i = p.plans.findIndex(x => x.id === plan.id);
+    if (i >= 0) p.plans[i] = plan; else p.plans.push(plan);
+    p.plans.sort((x, y) => x.date.localeCompare(y.date));
+    if (save()) { toast('Pauta guardada'); location.hash = `#/p/${p.id}/pauta/${plan.id}/ver`; }
+  }
+  if (f.id === 'fGroups') {
+    const fd = new FormData(f);
+    for (const g of db.groups) {
+      for (const k of ['kcal', 'p', 'c', 'g']) { const n = num(fd.get(`${g.id}.${k}`)); if (n != null) g[k] = n; }
+      g.ex = fd.get(`${g.id}.ex`).trim();
+      g.exBudget = fd.get(`${g.id}.exBudget`).trim();
+    }
+    if (save()) toast('Grupos guardados');
+  }
   if (f.id === 'fFood') {
     const v = Object.fromEntries(new FormData(f));
     const food = { name: v.name.trim(), kcal: num(v.kcal), p: num(v.p) || 0, c: num(v.c) || 0, g: num(v.g) || 0 };
@@ -524,6 +795,10 @@ app.addEventListener('click', e => {
   if (a === 'delControl' && confirm('¿Eliminar este control? No se puede deshacer.')) {
     const p = patient(id); p.controls = p.controls.filter(c => c.id !== cid);
     if (save()) { toast('Control eliminado'); location.hash = '#/p/' + id; }
+  }
+  if (a === 'delPlan' && confirm('¿Eliminar esta pauta? No se puede deshacer.')) {
+    const p = patient(id); p.plans = (p.plans || []).filter(x => x.id !== cid);
+    if (save()) { toast('Pauta eliminada'); location.hash = '#/p/' + id; }
   }
   if (a === 'print') print();
   if (a === 'export') exportBackup();
@@ -560,7 +835,7 @@ async function importBackup(file) {
     const d = JSON.parse(await file.text());
     if (!Array.isArray(d.patients) || !Array.isArray(d.foods)) throw 0;
     if (!confirm(`El respaldo tiene ${d.patients.length} pacientes. ¿Reemplazar los datos de este equipo?`)) return;
-    db = d; if (save()) { toast('Respaldo cargado'); location.hash = '#/'; route(); }
+    db = migrate(d); if (save()) { toast('Respaldo cargado'); location.hash = '#/'; route(); }
   } catch { alert('Ese archivo no es un respaldo válido de Consulta.'); }
 }
 
