@@ -108,6 +108,10 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 .mealgrid th,.mealgrid td{white-space:normal;padding:8px 4px;text-align:center}
 .mealgrid th:first-child,.mealgrid td:first-child{min-width:140px;text-align:left}
 .mealgrid input{width:52px!important}
+.pair{display:flex;gap:6px}
+.pair input{flex:1;min-width:0}
+.pair select{width:auto;flex:none;padding:11px 8px}
+.alert{margin-top:10px;padding:10px 14px;border-radius:12px;background:var(--warn);font-size:.9rem}
 label.check{display:flex;gap:10px;align-items:center;grid-column:1/-1;font-size:.95rem;color:var(--ink)}
 label.check input{width:22px;height:22px}
 .meal ul{list-style:none;display:grid;gap:10px;margin-top:8px}
@@ -331,7 +335,9 @@ function newPlan(p) {
 function targets(p, plan) {
   const c = sorted(p).at(-1), r = c ? results(p, c) : {}, w = c?.weight;
   const kcal = plan.kcalManual || (r.tdee ? r.tdee * (1 + (plan.adjust || 0)) : null);
-  const P = w && plan.protKg ? plan.protKg * w : null, G = kcal && plan.fatPct ? kcal * plan.fatPct / 900 : null;
+  // protKg y fatPct guardan el valor tal como se escribió; la unidad decide cómo se interpreta
+  const P = !plan.protKg ? null : plan.protUnit === 'g' ? plan.protKg : w ? plan.protKg * w : null;
+  const G = !plan.fatPct ? null : plan.fatUnit === 'g' ? plan.fatPct : kcal ? kcal * plan.fatPct / 900 : null;
   return { tdee: r.tdee, w, kcal, P, G, C: kcal && P != null && G != null ? (kcal - P * 4 - G * 9) / 4 : null };
 }
 function totals(portions) {
@@ -593,8 +599,10 @@ function vPlan(p, plan) {
         <label>Fecha<input type="date" name="date" value="${plan.date}" required></label>
         <label>Objetivo<select name="adjust">${GOALS.map(([v, l]) => `<option value="${v}" ${v == plan.adjust ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label>kcal fijas <span class="u">(opcional)</span><input name="kcalManual" inputmode="decimal" value="${plan.kcalManual ?? ''}" placeholder="Usa el gasto calculado"></label>
-        <label>Proteínas <span class="u">(g/kg)</span><input name="protKg" inputmode="decimal" value="${plan.protKg ?? ''}"></label>
-        <label>Grasas <span class="u">(% de kcal)</span><input name="fatPct" inputmode="decimal" value="${plan.fatPct ?? ''}"></label>
+        <label>Proteínas<span class="pair"><input name="protKg" inputmode="decimal" value="${plan.protKg ?? ''}">
+          <select name="protUnit" aria-label="Unidad de proteínas"><option value="gkg">g/kg</option><option value="g" ${plan.protUnit === 'g' ? 'selected' : ''}>g/día</option></select></span></label>
+        <label>Grasas<span class="pair"><input name="fatPct" inputmode="decimal" value="${plan.fatPct ?? ''}">
+          <select name="fatUnit" aria-label="Unidad de grasas"><option value="pct">% kcal</option><option value="g" ${plan.fatUnit === 'g' ? 'selected' : ''}>g/día</option></select></span></label>
       </div>
       <div id="tgt" style="margin-top:14px"></div>
     </section>
@@ -623,7 +631,7 @@ function readPlan(form, base) {
     const [a, b, c] = k.split('.');
     if (a === 'portions') { const n = num(v); if (n) plan.portions[b] = n; }
     else if (a === 'meals') { const n = num(v); if (n) (plan.meals[b] ||= {})[c] = n; }
-    else if (['date', 'prefer', 'avoid', 'activity', 'notes'].includes(a)) plan[a] = v;
+    else if (['date', 'prefer', 'avoid', 'activity', 'notes', 'protUnit', 'fatUnit'].includes(a)) plan[a] = v;
     else if (a !== 'showKcal' && a !== 'budget') plan[a] = num(v);
   }
   plan.showKcal = form.elements.showKcal.checked;
@@ -635,13 +643,18 @@ function targetsHtml(p, plan) {
   const t = targets(p, plan);
   if (!t.kcal) return '<p class="muted">Registra un control con peso y talla (y la fecha de nacimiento del paciente) para calcular el gasto, o escribe las kcal fijas.</p>';
   const pk = x => t.w && x != null ? ` · ${fmt(x / t.w)} g/kg` : '';
-  const pct = x => x != null ? fmt(x / t.kcal * 100, 0) + ' %' : '';
+  const pct = (g, k) => g != null ? fmt(g * k / t.kcal * 100, 0) + ' %' : '';
+  const warn = [];
+  if (plan.protKg && plan.protUnit !== 'g' && !t.w) warn.push('Para usar g/kg falta un control con peso. Regístralo o cambia la unidad a g/día.');
+  if (plan.protUnit !== 'g' && plan.protKg > 4) warn.push(`${fmt(plan.protKg)} g/kg de proteínas es muy alto. ¿Querías poner gramos al día? Cambia la unidad a g/día.`);
+  if (plan.fatUnit !== 'g' && plan.fatPct > 60) warn.push(`${fmt(plan.fatPct)} % de grasas no es posible en una pauta normal. ¿Querías poner gramos al día? Cambia la unidad a g/día.`);
+  if (t.C != null && t.C < 0) warn.push('Proteínas y grasas superan la meta de calorías: baja alguna.');
   return `<div class="tiles">
     <div class="tile"><small>Meta diaria</small><strong>${fmt(t.kcal, 0)}</strong><em>kcal${t.tdee && !plan.kcalManual ? ' · gasto ' + fmt(t.tdee, 0) : ''}</em></div>
-    <div class="tile"><small>Proteínas</small><strong>${fmt(t.P, 0)} g</strong><em>${pct(t.P * 4)}${pk(t.P)}</em></div>
-    <div class="tile"><small>Grasas</small><strong>${fmt(t.G, 0)} g</strong><em>${pct(t.G * 9)}${pk(t.G)}</em></div>
-    <div class="tile"><small>Carbohidratos</small><strong>${fmt(t.C, 0)} g</strong><em>${pct(t.C * 4)}${pk(t.C)}</em></div>
-  </div>${t.C != null && t.C < 0 ? '<p class="chip warn" style="margin-top:8px">Proteínas y grasas superan la meta de calorías: baja alguna.</p>' : ''}`;
+    <div class="tile"><small>Proteínas</small><strong>${fmt(t.P, 0)} g</strong><em>${pct(t.P, 4)}${pk(t.P)}</em></div>
+    <div class="tile"><small>Grasas</small><strong>${fmt(t.G, 0)} g</strong><em>${pct(t.G, 9)}${pk(t.G)}</em></div>
+    <div class="tile"><small>Carbohidratos</small><strong>${fmt(t.C, 0)} g</strong><em>${pct(t.C, 4)}${pk(t.C)}</em></div>
+  </div>${warn.map(m => `<p class="alert">${m}</p>`).join('')}`;
 }
 
 function totalsHtml(p, plan) {
