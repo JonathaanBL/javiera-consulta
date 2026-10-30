@@ -121,6 +121,12 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 .pair input{flex:1;min-width:0}
 .pair select{width:auto;flex:none;padding:11px 8px}
 .alert{margin-top:10px;padding:10px 14px;border-radius:12px;background:var(--warn);font-size:.9rem}
+.alerts{display:grid;gap:8px}
+.alerts .alert{margin:0}
+.alert.alta{background:#FBDAD5;border-left:4px solid #B3261E}
+.alert.info{background:var(--soft);border-left:4px solid var(--green)}
+.conds{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px 16px}
+.conds label.check{grid-column:auto;font-weight:500}
 label.check{display:flex;gap:10px;align-items:center;grid-column:1/-1;font-size:.95rem;color:var(--ink)}
 label.check input{width:22px;height:22px}
 .meal ul{list-style:none;display:grid;gap:10px;margin-top:8px}
@@ -367,33 +373,116 @@ const SPLIT = {
   lacteosAG: { desayuno: 1, col2: 1, once: .5 }, lacteosMG: { desayuno: 1, col2: 1, once: .5 }, lacteosBG: { desayuno: 1, col2: 1, once: .5 },
   aceites: { almuerzo: 1, cena: 1 }, lipidos: { once: 1, col1: 1 }, azucares: { desayuno: 1, once: 1 }
 };
-// alimentos concretos por porción: [cantidad, singular, plural], regular (r) y económico (b), según el tipo de comida
+// Alimentos concretos por porción, según el tipo de comida: regular (r) y económico (b).
+// Cada uno: [cantidad casera, singular, plural, gramos o ml por porción, nombre para "solo gramos", unidad].
+// Los gramos salen de las kcal de la porción y la tabla de alimentos (ej: 140 kcal ÷ 1,3 kcal/g de arroz ≈ 110 g).
 const CTX = { desayuno: 'pan', once: 'pan', col1: 'col', col2: 'col', almuerzo: 'plato', cena: 'plato' };
+const one = a => ({ r: a });
 const ITEMS = {
-  cereales: { pan: { r: [.5, 'marraqueta integral', 'marraquetas integrales'], b: [.5, 'marraqueta', 'marraquetas'] },
-    plato: { r: [.75, 'taza de arroz integral o quinoa cocida', 'tazas de arroz integral o quinoa cocida'], b: [.75, 'taza de arroz o fideos cocidos', 'tazas de arroz o fideos cocidos'] },
-    col: { r: [.5, 'taza de avena', 'tazas de avena'] } },
-  leguminosas: { plato: { r: [.75, 'taza de legumbres cocidas', 'tazas de legumbres cocidas'] } },
-  verdurasG: { plato: { r: [1, 'taza de verduras cocidas (brócoli, zapallo italiano o zanahoria)', 'tazas de verduras cocidas (brócoli, zapallo italiano o zanahoria)'], b: [1, 'taza de verduras de temporada cocidas', 'tazas de verduras de temporada cocidas'] } },
-  verdurasL: { plato: { r: [1, 'plato de ensalada (lechuga, tomate, pepino)', 'platos de ensalada (lechuga, tomate, pepino)'], b: [1, 'plato de ensalada de temporada', 'platos de ensalada de temporada'] } },
-  frutas: { col: { r: [1, 'fruta (manzana, pera, naranja o kiwi)', 'frutas (manzana, pera, naranja o kiwi)'], b: [1, 'fruta de temporada', 'frutas de temporada'] } },
-  carnesBG: { plato: { r: [50, 'g de pollo, pavo o pescado', 'g de pollo, pavo o pescado'], b: [50, 'g de pollo sin piel o jurel', 'g de pollo sin piel o jurel'] },
-    pan: { r: [2, 'rebanada de jamón de pavo', 'rebanadas de jamón de pavo'], b: [3, 'clara de huevo', 'claras de huevo'] } },
-  carnesAG: { pan: { r: [1, 'huevo', 'huevos'] },
-    plato: { r: [50, 'g de carne magra o salmón', 'g de carne magra o salmón'], b: [50, 'g de carne molida o trutro', 'g de carne molida o trutro'] } },
-  lacteosAG: { pan: { r: [1, 'taza de leche entera', 'tazas de leche entera'], b: [1, 'taza de leche entera (puede ser en polvo)', 'tazas de leche entera (puede ser en polvo)'] } },
-  lacteosMG: { pan: { r: [1, 'taza de leche semidescremada', 'tazas de leche semidescremada'] }, col: { r: [1, 'yogur', 'yogures'] } },
-  lacteosBG: { pan: { r: [1, 'taza de leche descremada', 'tazas de leche descremada'], b: [1, 'taza de leche descremada (puede ser en polvo)', 'tazas de leche descremada (puede ser en polvo)'] },
-    col: { r: [1, 'yogur descremado', 'yogures descremados'], b: [1, 'taza de yogur descremado de pote grande', 'tazas de yogur descremado de pote grande'] } },
-  aceites: { plato: { r: [4, 'cucharadita de aceite de oliva', 'cucharaditas de aceite de oliva'], b: [4, 'cucharadita de aceite vegetal', 'cucharaditas de aceite vegetal'] } },
-  lipidos: { pan: { r: [1 / 3, 'palta', 'paltas'] }, col: { r: [25, 'g de almendras o nueces', 'g de almendras o nueces'], b: [25, 'g de maní sin sal', 'g de maní sin sal'] } },
-  azucares: { pan: { r: [1, 'cucharadita de miel o mermelada', 'cucharaditas de miel o mermelada'] } }
+  cereales: { pan: { r: [.5, 'marraqueta integral', 'marraquetas integrales', 55, 'pan integral'], b: [.5, 'marraqueta', 'marraquetas', 50, 'marraqueta'] },
+    plato: { r: [.75, 'taza de arroz integral o quinoa cocida', 'tazas de arroz integral o quinoa cocida', 125, 'arroz integral o quinoa cocida'], b: [.75, 'taza de arroz o fideos cocidos', 'tazas de arroz o fideos cocidos', 110, 'arroz o fideos cocidos'] },
+    col: one([.5, 'taza de avena', 'tazas de avena', 35, 'avena']) },
+  leguminosas: { plato: one([.75, 'taza de legumbres cocidas', 'tazas de legumbres cocidas', 140, 'legumbres cocidas']) },
+  verdurasG: { plato: { r: [1, 'taza de verduras cocidas (brócoli, zapallo italiano o zanahoria)', 'tazas de verduras cocidas (brócoli, zapallo italiano o zanahoria)', 100, 'verduras cocidas (brócoli, zapallo italiano o zanahoria)'], b: [1, 'taza de verduras de temporada cocidas', 'tazas de verduras de temporada cocidas', 100, 'verduras de temporada cocidas'] } },
+  verdurasL: { plato: { r: [1, 'plato de ensalada (lechuga, tomate, pepino)', 'platos de ensalada (lechuga, tomate, pepino)', 100, 'ensalada (lechuga, tomate, pepino)'], b: [1, 'plato de ensalada de temporada', 'platos de ensalada de temporada', 100, 'ensalada de temporada'] } },
+  frutas: { col: { r: [1, 'fruta (manzana, pera, naranja o kiwi)', 'frutas (manzana, pera, naranja o kiwi)', 130, 'fruta (manzana, pera, naranja o kiwi)'], b: [1, 'fruta de temporada', 'frutas de temporada', 130, 'fruta de temporada'] } },
+  carnesBG: { plato: { r: [50, 'g de pollo, pavo o pescado', 'g de pollo, pavo o pescado', 50], b: [50, 'g de pollo sin piel o jurel', 'g de pollo sin piel o jurel', 50] },
+    pan: { r: [2, 'rebanada de jamón de pavo', 'rebanadas de jamón de pavo', 50, 'jamón de pavo'], b: [3, 'clara de huevo', 'claras de huevo', 100, 'clara de huevo'] } },
+  carnesAG: { pan: one([1, 'huevo', 'huevos', 55, 'huevo']),
+    plato: { r: [50, 'g de carne magra o salmón', 'g de carne magra o salmón', 50], b: [50, 'g de carne molida o trutro', 'g de carne molida o trutro', 50] } },
+  lacteosAG: { pan: { r: [1, 'taza de leche entera', 'tazas de leche entera', 200, 'leche entera', 'ml'], b: [1, 'taza de leche entera (puede ser en polvo)', 'tazas de leche entera (puede ser en polvo)', 200, 'leche entera (puede ser en polvo)', 'ml'] } },
+  lacteosMG: { pan: one([1, 'taza de leche semidescremada', 'tazas de leche semidescremada', 200, 'leche semidescremada', 'ml']), col: one([1, 'yogur', 'yogures', 125, 'yogur']) },
+  lacteosBG: { pan: { r: [1, 'taza de leche descremada', 'tazas de leche descremada', 200, 'leche descremada', 'ml'], b: [1, 'taza de leche descremada (puede ser en polvo)', 'tazas de leche descremada (puede ser en polvo)', 200, 'leche descremada (puede ser en polvo)', 'ml'] },
+    col: { r: [1, 'yogur descremado', 'yogures descremados', 125, 'yogur descremado'], b: [1, 'taza de yogur descremado de pote grande', 'tazas de yogur descremado de pote grande', 175, 'yogur descremado de pote grande'] } },
+  aceites: { plato: { r: [4, 'cucharadita de aceite de oliva', 'cucharaditas de aceite de oliva', 20, 'aceite de oliva', 'ml'], b: [4, 'cucharadita de aceite vegetal', 'cucharaditas de aceite vegetal', 20, 'aceite vegetal', 'ml'] } },
+  lipidos: { pan: one([.5, 'palta', 'paltas', 110, 'palta']), col: { r: [30, 'g de almendras o nueces', 'g de almendras o nueces', 30], b: [30, 'g de maní sin sal', 'g de maní sin sal', 30] } },
+  azucares: { pan: one([1, 'cucharadita de miel o mermelada', 'cucharaditas de miel o mermelada', 5, 'miel o mermelada']) }
 };
+
+// ---------- condiciones del paciente: alertas y cambios en el menú ----------
+const CONDS = [['embarazo', 'Embarazo'], ['lactancia', 'Lactancia'], ['diabetes', 'Diabetes o resistencia a la insulina'], ['hipertension', 'Hipertensión'],
+  ['renal', 'Enfermedad renal'], ['celiaquia', 'Celiaquía'], ['lactosa', 'Intolerancia a la lactosa'], ['vegetariano', 'Vegetariano'], ['vegano', 'Vegano']];
+const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+// palabras que, si aparecen en el menú, chocan con cada alergia
+const ALLERGY_WORDS = { mani: ['mani'], 'frutos secos': ['mani', 'almendra', 'nuez', 'nueces', 'pistacho'], nuez: ['nuez', 'nueces'], almendra: ['almendra'],
+  huevo: ['huevo', 'clara'], pescado: ['pescado', 'salmon', 'jurel', 'atun', 'merluza'], mariscos: ['marisco', 'camaron'], leche: ['leche', 'yogur', 'queso', 'quesillo'],
+  soya: ['soya', 'tofu'], gluten: ['marraqueta', 'fideos', 'pan integral'], trigo: ['marraqueta', 'fideos', 'pan integral'] };
+const allergyList = p => norm(p.allergies).split(/[,;\n]|\sy\s/).map(s => s.trim()).filter(Boolean);
+const allergic = (p, key) => allergyList(p).some(a => a.includes(key) || key.includes(a));
+
+function itemsFor(p) {
+  const it = structuredClone(ITEMS), c = p.cond || {};
+  if (c.celiaquia || allergic(p, 'gluten') || allergic(p, 'trigo')) {
+    it.cereales.pan = one([2, 'rebanada de pan sin gluten', 'rebanadas de pan sin gluten', 55, 'pan sin gluten']);
+    it.cereales.plato = one([.75, 'taza de arroz o quinoa cocida', 'tazas de arroz o quinoa cocida', 115, 'arroz o quinoa cocida']);
+    it.cereales.col = one([.5, 'taza de avena certificada sin gluten', 'tazas de avena certificada sin gluten', 35, 'avena certificada sin gluten']);
+  }
+  const milk = c.vegano || allergic(p, 'leche');
+  for (const g of ['lacteosAG', 'lacteosMG', 'lacteosBG']) {
+    if (milk) it[g] = { pan: one([1, 'taza de bebida de soya fortificada', 'tazas de bebida de soya fortificada', 200, 'bebida de soya fortificada', 'ml']), col: one([1, 'taza de bebida de soya fortificada', 'tazas de bebida de soya fortificada', 200, 'bebida de soya fortificada', 'ml']) };
+    else if (c.lactosa) it[g] = { pan: one([1, 'taza de leche sin lactosa', 'tazas de leche sin lactosa', 200, 'leche sin lactosa', 'ml']), col: one([1, 'yogur sin lactosa', 'yogures sin lactosa', 125, 'yogur sin lactosa']) };
+  }
+  if (c.vegano) {
+    const tofu = g => one([g, 'g de tofu', 'g de tofu', g]);
+    it.carnesBG = { plato: tofu(85), pan: tofu(85) }; it.carnesAG = { plato: tofu(150), pan: tofu(150) };
+  } else if (c.vegetariano) {
+    it.carnesBG = { plato: one([.5, 'taza de legumbres cocidas o 85 g de tofu', 'tazas de legumbres cocidas o tofu', 85, 'tofu o legumbres']), pan: one([3, 'clara de huevo', 'claras de huevo', 100, 'clara de huevo']) };
+    it.carnesAG.plato = one([1, 'huevo', 'huevos', 55, 'huevo']);
+  }
+  if (allergic(p, 'soya')) { // sin bebida de soya ni tofu
+    const soy = v => v?.r?.[1]?.includes('soya');
+    for (const g of ['lacteosAG', 'lacteosMG', 'lacteosBG']) for (const k of ['pan', 'col']) if (soy(it[g][k])) it[g][k] = one([1, 'taza de bebida de avena fortificada', 'tazas de bebida de avena fortificada', 200, 'bebida de avena fortificada', 'ml']);
+    const leg = g => one([g / 170, 'taza de legumbres cocidas', 'tazas de legumbres cocidas', g, 'legumbres cocidas']);
+    for (const g of ['carnesBG', 'carnesAG']) for (const k of ['pan', 'plato']) if (it[g][k]?.r?.[1]?.includes('tofu')) it[g][k] = leg(it[g][k].r[3]);
+  }
+  if (allergic(p, 'pescado')) { it.carnesBG.plato = one([50, 'g de pollo o pavo', 'g de pollo o pavo', 50]); if (!c.vegetariano && !c.vegano) it.carnesAG.plato = one([50, 'g de carne magra', 'g de carne magra', 50]); }
+  if (allergic(p, 'huevo')) { it.carnesAG.pan = one([2, 'rebanada de jamón de pavo', 'rebanadas de jamón de pavo', 50, 'jamón de pavo']); it.carnesBG.pan = it.carnesAG.pan; }
+  if (allergic(p, 'mani') || allergic(p, 'frutos secos') || allergic(p, 'nuez') || allergic(p, 'almendra')) it.lipidos.col = one([.5, 'palta', 'paltas', 110, 'palta']);
+  return it;
+}
+
+// alertas clínicas del paciente; si se pasa una pauta, también revisa su menú contra las alergias
+function alertsFor(p, plan) {
+  const c = p.cond || {}, age = ageAt(p.birth, today()), out = [];
+  if (age != null && age < 18) out.push(['alta', 'Menor de 18 años: evalúa con curvas IMC/edad de la OMS y requerimientos pediátricos. La sugerencia no aplica déficit.']);
+  if (age >= 65) out.push(['info', 'Adulto mayor: IMC con cortes MINSAL. Cuida la proteína (mínimo 1,0 a 1,2 g/kg) y evita déficits agresivos.']);
+  if (c.embarazo) out.push(['alta', 'Embarazo: sin déficit calórico. Suma energía según trimestre (aprox. +340 kcal en el 2º y +450 kcal en el 3º, con «kcal fijas») y evalúa con la curva de incremento de peso gestacional, no con el IMC.']);
+  if (c.lactancia) out.push(['alta', 'Lactancia: suma alrededor de 400 a 500 kcal al día (con «kcal fijas») y evita déficits marcados.']);
+  if (c.diabetes) out.push(['alta', 'Diabetes: reparte los carbohidratos parejo en el día, prefiere integrales y legumbres, sin azúcares añadidos. Coordina con su tratamiento médico.']);
+  if (c.hipertension) out.push(['info', 'Hipertensión: menos de 5 g de sal al día (OMS). Evitar embutidos, snacks salados y sopas en sobre.']);
+  if (c.renal) out.push(['alta', 'Enfermedad renal: proteína, potasio y fósforo dependen de la etapa. La sugerencia usa 0,8 g/kg de proteína; ajústala según el nefrólogo.']);
+  if (c.celiaquia) out.push(['info', 'Celiaquía: el menú sugerido usa alimentos sin gluten. Revisar siempre el sello «sin gluten».']);
+  if (c.lactosa) out.push(['info', 'Intolerancia a la lactosa: el menú sugerido usa lácteos sin lactosa.']);
+  if (c.vegano) out.push(['info', 'Vegano: el menú usa tofu, legumbres y bebidas vegetales fortificadas. Indicar suplemento de vitamina B12.']);
+  else if (c.vegetariano) out.push(['info', 'Vegetariano: el menú cambia las carnes por huevo, legumbres y tofu. Vigilar hierro y B12.']);
+  if (p.allergies?.trim()) out.push(['alta', `Alergias o intolerancias: ${esc(p.allergies.trim())}.`]);
+  if (plan) {
+    const text = norm(Object.values(plan.menu || {}).join(' ') + ' ' + (plan.prefer || ''));
+    for (const a of allergyList(p)) {
+      const words = Object.entries(ALLERGY_WORDS).find(([k]) => a.includes(k) || k.includes(a))?.[1] || [a];
+      const hit = words.find(w => w.length > 2 && text.includes(w));
+      if (hit) out.push(['alta', `⚠ La pauta menciona «${hit}» y el paciente tiene alergia a ${esc(a)}. Revísala.`]);
+    }
+  }
+  return out;
+}
+const alertsHtml = list => list.length ? `<div class="alerts">${list.map(([lvl, t]) => `<p class="alert ${lvl}">${t}</p>`).join('')}</div>` : '';
+
 function suggestText(p) {
   const c = sorted(p).at(-1), r = c ? results(p, c) : null;
   if (!r?.tdee) return 'Para que la app sugiera una pauta, el paciente necesita fecha de nacimiento y un control con peso y talla.';
-  const adj = SUGGEST_ADJUST[r.imcClass];
-  return `<b>IMC ${fmt(r.imc)}${r.imcClass ? ' · ' + r.imcClass : ''}.</b> ${adj == null ? 'Elige el objetivo a mano (menor de 18 años).' : 'Se sugiere: ' + GOALS.find(([v]) => v === adj)[1].toLowerCase() + '.'} La sugerencia arma porciones, reparto y menú; después puedes cambiar todo.`;
+  const adj = goalFor(p, r.imcClass);
+  return `<b>IMC ${fmt(r.imc)}${r.imcClass ? ' · ' + r.imcClass : ''}.</b> ${adj == null ? 'Elige el objetivo a mano.' : 'Se sugiere: ' + GOALS.find(([v]) => v === adj)[1].toLowerCase() + '.'} La sugerencia arma porciones, reparto y menú según sus condiciones; después puedes cambiar todo.`;
+}
+// objetivo sugerido según IMC, corregido por condiciones donde un déficit no corresponde
+function goalFor(p, cls) {
+  const c = p.cond || {}, age = ageAt(p.birth, today());
+  let adj = SUGGEST_ADJUST[cls];
+  if (age != null && age < 18) return 0;
+  if (adj == null) return null;
+  if (c.embarazo || c.lactancia) adj = Math.max(0, adj);
+  if (age >= 65) adj = Math.max(-.1, adj);
+  return adj;
 }
 const half = x => Math.max(0, Math.round(x * 2) / 2);
 function suggestPortions(t) {
@@ -423,37 +512,50 @@ function fq(x) {
   const q = Math.round(x * 4) / 4, qw = Math.floor(q), qf = q - qw; // medidas caseras: al cuarto más cercano
   return qf ? (qw || '') + { .25: '¼', .5: '½', .75: '¾' }[qf] : String(qw);
 }
-function buildMenu(plan) {
-  const menu = {};
+const round5 = x => x < 20 ? Math.round(x) : Math.round(x / 5) * 5;
+// units: 'ambos' (¾ taza de arroz (110 g)), 'gramos' (110 g de arroz) o 'caseras' (¾ taza de arroz)
+function buildMenu(plan, p) {
+  const items = itemsFor(p), units = plan.units || 'ambos', menu = {};
   for (const [m] of MEALS) {
     const parts = Object.entries(plan.meals[m] || {}).map(([gid, n]) => {
-      const it = ITEMS[gid]; if (!it) return '';
-      const v = it[CTX[m]] || it.pan || it.plato || it.col, [q, s, pl] = plan.budget && v.b ? v.b : v.r, x = q * n;
-      return `${fq(x)} ${x <= 1 ? s : pl}`;
+      const it = items[gid]; if (!it) return '';
+      const v = it[CTX[m]] || it.pan || it.plato || it.col, [q, s, pl, g, name, u = 'g'] = plan.budget && v.b ? v.b : v.r, x = q * n;
+      const casera = `${fq(x)} ${x <= 1 ? s : pl}`;
+      if (s.startsWith('g de')) return `${round5(x)} ${s}`; // ya está en gramos
+      if (units === 'gramos') return `${round5(g * n)} ${u} de ${name}`;
+      return units === 'caseras' ? casera : `${casera} (${round5(g * n)} ${u})`;
     }).filter(Boolean);
     if (parts.length) menu[m] = parts.join(' + ');
   }
   return menu;
 }
-function tips(adjust, budget) {
+function tips(adjust, budget, p) {
+  const c = p.cond || {};
   const t = adjust < 0
     ? { prefer: 'Verduras en almuerzo y cena\nPreparaciones al horno, a la plancha o cocidas\nAgua como bebida principal', avoid: 'Bebidas y jugos azucarados\nFrituras y comida rápida\nPastelería, galletas dulces y snacks' }
     : adjust > 0
       ? { prefer: 'No saltarse comidas\nProteína en cada comida principal\nFrutos secos o palta en las colaciones', avoid: 'Reemplazar comidas por bebidas o snacks' }
       : { prefer: 'Comer a horarios regulares\nVerduras en almuerzo y cena', avoid: 'Bebidas azucaradas\nFrituras' };
   if (budget) t.prefer += '\nLegumbres 2 a 3 veces por semana en vez de la carne del almuerzo\nFrutas y verduras de temporada, de la feria\nArroz, avena y legumbres a granel';
+  if (c.diabetes) { t.prefer += '\nCarbohidratos repartidos en todas las comidas\nPan y cereales integrales'; t.avoid += '\nAzúcar, miel y jugos (también los naturales)'; }
+  if (c.hipertension) { t.prefer += '\nCocinar con poca sal y usar hierbas y especias'; t.avoid += '\nEmbutidos, snacks salados y sopas en sobre\nSal agregada en la mesa'; }
+  if (c.celiaquia) t.avoid += '\nTrigo, centeno, cebada y productos sin sello «sin gluten»';
+  if (c.embarazo) t.avoid += '\nAlcohol\nCarnes, pescados y huevos crudos o poco cocidos\nQuesos frescos no pasteurizados';
+  if (allergyList(p).length) t.avoid += '\n' + p.allergies.split(/[,;\n]/).map(a => a.trim()).filter(Boolean).map(a => `Alergia: ${a}`).join('\n');
   return t;
 }
 function suggestPlan(p, plan, budget) {
   const c = sorted(p).at(-1); if (!c) return null;
-  const cls = results(p, c).imcClass, adjust = SUGGEST_ADJUST[cls] ?? plan.adjust ?? 0;
-  const s = { ...plan, adjust, kcalManual: null, protUnit: 'gkg', protKg: SUGGEST_PROT[cls] ?? 1.6, fatUnit: 'pct', fatPct: adjust > 0 ? 30 : 25, budget };
+  const cls = results(p, c).imcClass, adjust = goalFor(p, cls) ?? plan.adjust ?? 0, cond = p.cond || {}, age = ageAt(p.birth, today());
+  let protKg = SUGGEST_PROT[cls] ?? 1.6;
+  if (cond.renal) protKg = .8; else if (age >= 65) protKg = Math.max(1.2, protKg);
+  const s = { ...plan, adjust, kcalManual: null, protUnit: 'gkg', protKg, fatUnit: 'pct', fatPct: adjust > 0 ? 30 : 25, budget };
   const t = targets(p, s); if (!t.kcal || t.P == null) return null;
   s.portions = suggestPortions(t);
   s.meals = {};
   for (const [gid, n] of Object.entries(s.portions)) for (const [m, v] of Object.entries(allocate(n, SPLIT[gid] || { almuerzo: 1 }))) (s.meals[m] ||= {})[gid] = v;
-  s.menu = buildMenu(s);
-  const tp = tips(adjust, budget); s.prefer = tp.prefer; s.avoid = tp.avoid;
+  s.menu = buildMenu(s, p);
+  const tp = tips(adjust, budget, p); s.prefer = tp.prefer; s.avoid = tp.avoid;
   return s;
 }
 console.assert(JSON.stringify(allocate(3, { a: 1, b: 1, c: 1 })) === '{"a":1,"b":1,"c":1}' && JSON.stringify(allocate(4.5, { x: 1, y: 2 })) === '{"x":1.5,"y":3}', 'reparto');
@@ -522,7 +624,10 @@ function vPatientForm(p) {
       <label>Teléfono<input name="phone" type="tel" value="${esc(v.phone)}"></label>
       <label>Deporte / actividad<input name="sport" value="${esc(v.sport)}" placeholder="Ej: running, crossfit"></label>
       <label style="grid-column:1/-1">Objetivo<input name="goal" value="${esc(v.goal)}" placeholder="Ej: bajar grasa manteniendo masa muscular"></label>
-      <label style="grid-column:1/-1">Notas clínicas (alergias, patologías, medicamentos, preferencias)<textarea name="notes">${esc(v.notes)}</textarea></label>
+      <fieldset style="grid-column:1/-1"><legend style="font-size:1rem;margin-bottom:4px">Condiciones</legend>
+        <div class="conds">${CONDS.map(([k, l]) => `<label class="check"><input type="checkbox" name="cond.${k}" ${v.cond?.[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div></fieldset>
+      <label style="grid-column:1/-1">Alergias e intolerancias <span class="u">(separadas por coma)</span><input name="allergies" value="${esc(v.allergies)}" placeholder="Ej: maní, mariscos, huevo"></label>
+      <label style="grid-column:1/-1">Notas clínicas (otras patologías, medicamentos, preferencias)<textarea name="notes">${esc(v.notes)}</textarea></label>
     </div>
     <div class="actions"><button class="btn">Guardar</button><a class="btn ghost" href="${p ? '#/p/' + p.id : '#/'}">Cancelar</a>
       ${p ? '<button type="button" class="btn danger" data-action="delPatient">Eliminar paciente</button>' : ''}</div>
@@ -545,6 +650,7 @@ function vPatient(p) {
   return `<div class="head"><div><h1>${esc(p.name)}</h1>
       <p class="muted">${[p.sex === 'M' ? 'Masculino' : 'Femenino', age != null ? age + ' años' : null, p.sport, p.phone].filter(Boolean).map(esc).join(' · ')}</p></div>
     <div class="actions"><a class="btn" href="#/p/${p.id}/control">+ Nuevo control</a><a class="btn lime" href="#/p/${p.id}/pauta">+ Nueva pauta</a><a class="btn ghost" href="#/p/${p.id}/informe">Informe</a><a class="btn ghost" href="#/p/${p.id}/editar">Editar</a></div></div>
+  ${alertsHtml(alertsFor(p))}
   ${p.goal || p.notes ? `<div class="card">${p.goal ? `<p><b>Objetivo:</b> ${esc(p.goal)}</p>` : ''}${p.notes ? `<p class="muted" style="margin-top:6px;white-space:pre-wrap">${esc(p.notes)}</p>` : ''}</div>` : ''}
   ${c ? `<section><p class="muted" style="margin-bottom:10px">Último control: ${fdate(c.date)}${prev ? ` · comparado con ${fdate(prev.date)}` : ''}</p>
     <div class="tiles">
@@ -707,6 +813,7 @@ function vPlan(p, plan) {
   const saved = (p.plans || []).some(x => x.id === plan.id);
   return `<div class="head"><div><h1>Pauta alimentaria</h1><p class="muted">${esc(p.name)}</p></div><a class="btn ghost" href="#/p/${p.id}">← Volver</a></div>
   <form id="fPlan" style="display:grid;gap:20px">
+    <div id="planAlerts"></div>
     <section class="card"><h2>1 · Meta de calorías y macronutrientes</h2>
       <div class="suggest"><p>${suggestText(p)}</p>
         <div class="actions"><button type="button" class="btn" data-action="suggest" data-budget="0">Sugerir pauta regular</button>
@@ -714,10 +821,10 @@ function vPlan(p, plan) {
       <div class="grid">
         <label>Fecha<input type="date" name="date" value="${plan.date}" required></label>
         <label>Objetivo<select name="adjust">${GOALS.map(([v, l]) => `<option value="${v}" ${v == plan.adjust ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        <label>kcal fijas <span class="u">(opcional)</span><input name="kcalManual" inputmode="decimal" value="${plan.kcalManual ?? ''}" placeholder="Usa el gasto calculado"></label>
-        <label>Proteínas<span class="pair"><input name="protKg" inputmode="decimal" value="${plan.protKg ?? ''}">
+        <label>kcal fijas <span class="u">(opcional)</span><input name="kcalManual" inputmode="decimal" value="${String(plan.kcalManual ?? '').replace('.', ',')}" placeholder="Usa el gasto calculado"></label>
+        <label>Proteínas<span class="pair"><input name="protKg" inputmode="decimal" value="${String(plan.protKg ?? '').replace('.', ',')}">
           <select name="protUnit" aria-label="Unidad de proteínas"><option value="gkg">g/kg</option><option value="g" ${plan.protUnit === 'g' ? 'selected' : ''}>g/día</option></select></span></label>
-        <label>Grasas<span class="pair"><input name="fatPct" inputmode="decimal" value="${plan.fatPct ?? ''}">
+        <label>Grasas<span class="pair"><input name="fatPct" inputmode="decimal" value="${String(plan.fatPct ?? '').replace('.', ',')}">
           <select name="fatUnit" aria-label="Unidad de grasas"><option value="pct">% kcal</option><option value="g" ${plan.fatUnit === 'g' ? 'selected' : ''}>g/día</option></select></span></label>
       </div>
       <div id="tgt" style="margin-top:14px"></div>
@@ -730,6 +837,8 @@ function vPlan(p, plan) {
     <section class="card"><h2>3 · Reparto por comida</h2><p class="hint" style="margin-bottom:10px">Reparte las porciones de cada grupo entre las comidas. Se aceptan medias porciones (0,5).</p><div id="meals"></div></section>
     <section class="card"><h2>4 · Menú de ejemplo</h2>
       <p class="hint" style="margin-bottom:10px">Lo que el paciente ve como ejemplo de cada comida. Edítalo como quieras, o rehazlo a partir del reparto.</p>
+      <label style="margin-bottom:12px;max-width:360px">Cantidades<select name="units">
+        ${[['ambos', 'Medidas caseras y gramos'], ['gramos', 'Solo gramos'], ['caseras', 'Solo medidas caseras']].map(([v, l]) => `<option value="${v}" ${(plan.units || 'ambos') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <div class="grid">${MEALS.map(([m, l]) => `<label style="grid-column:1/-1">${l}<textarea name="menu.${m}" style="min-height:56px" placeholder="Ej: 1 taza de leche descremada + ½ marraqueta + 1 huevo">${esc(plan.menu?.[m])}</textarea></label>`).join('')}</div>
       <div class="actions" style="margin-top:12px"><button type="button" class="btn ghost" data-action="remenu">Rehacer menú desde el reparto</button></div>
     </section>
@@ -753,7 +862,7 @@ function readPlan(form, base) {
     if (a === 'portions') { const n = num(v); if (n) plan.portions[b] = n; }
     else if (a === 'menu') { if (v.trim()) plan.menu[b] = v.trim(); }
     else if (a === 'meals') { const n = num(v); if (n) (plan.meals[b] ||= {})[c] = n; }
-    else if (['date', 'prefer', 'avoid', 'activity', 'notes', 'protUnit', 'fatUnit'].includes(a)) plan[a] = v;
+    else if (['date', 'prefer', 'avoid', 'activity', 'notes', 'protUnit', 'fatUnit', 'units'].includes(a)) plan[a] = v;
     else if (a !== 'showKcal' && a !== 'budget') plan[a] = num(v);
   }
   plan.showKcal = form.elements.showKcal.checked;
@@ -799,6 +908,7 @@ function mealsHtml(plan) {
 }
 
 function updatePlanUI(p, plan) {
+  $('#planAlerts').innerHTML = alertsHtml(alertsFor(p, plan));
   $('#tgt').innerHTML = targetsHtml(p, plan);
   $('#tot').innerHTML = totalsHtml(p, plan);
   for (const g of db.groups) {
@@ -876,6 +986,11 @@ function initPlanForm(p) {
       }
       ui.plan = readPlan(fp, ui.plan);
       if (e.target.name?.startsWith('portions.')) $('#meals').innerHTML = mealsHtml(ui.plan); // los grupos del reparto siguen a las porciones
+      if (e.target.name === 'units' || e.target.name === 'budget') { // el menú cambia de formato o de alimentos
+        ui.plan.menu = buildMenu(ui.plan, p);
+        for (const [m] of MEALS) fp.elements['menu.' + m].value = ui.plan.menu[m] || '';
+        toast('Menú actualizado');
+      }
       updatePlanUI(p, ui.plan);
   });
 }
@@ -901,6 +1016,8 @@ app.addEventListener('submit', e => {
     const v = Object.fromEntries(new FormData(f));
     v.name = v.name.trim();
     if (!v.name) return toast('Escribe el nombre');
+    v.cond = {};
+    for (const k of Object.keys(v)) if (k.startsWith('cond.')) { v.cond[k.slice(5)] = true; delete v[k]; }
     let p = patient(id);
     if (p) Object.assign(p, v); else { p = { id: uid(), controls: [], created: today(), ...v }; db.patients.push(p); }
     if (save()) { toast('Paciente guardado'); location.hash = '#/p/' + p.id; }
@@ -960,7 +1077,7 @@ app.addEventListener('click', e => {
   if (a === 'suggest' || a === 'remenu') {
     const p = patient(id), f = $('#fPlan');
     ui.plan = readPlan(f, ui.plan);
-    if (a === 'remenu') { ui.plan.menu = buildMenu(ui.plan); toast('Menú rehecho desde el reparto'); }
+    if (a === 'remenu') { ui.plan.menu = buildMenu(ui.plan, p); toast('Menú rehecho desde el reparto'); }
     else {
       const budget = e.target.closest('[data-budget]').dataset.budget === '1';
       const s = suggestPlan(p, ui.plan, budget);
