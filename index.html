@@ -92,6 +92,10 @@ textarea{min-height:80px;resize:vertical}
 .tile em.up{color:#9A3412}.tile em.down{color:#1F6B3A}
 .chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:700;background:var(--soft)}
 .chip.warn{background:var(--warn)}
+.chip.err{background:#B3261E;color:#fff}
+input.over{border-color:#B3261E;animation:shake .35s}
+@keyframes shake{25%{translate:-4px}75%{translate:4px}}
+@media (prefers-reduced-motion:reduce){input.over{animation:none}}
 .res{display:grid;gap:8px}
 .res div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:8px}
 .res div:last-child{border:0;padding:0}
@@ -608,7 +612,7 @@ function vPlan(p, plan) {
     </section>
     <section class="card"><h2>2 · Porciones del día</h2>
       <div class="tablewrap"><table><thead><tr><th>Grupo</th><th>kcal por porción</th><th>Porciones</th></tr></thead>
-      <tbody>${db.groups.map(g => `<tr><td>${esc(g.name)}</td><td>${fmt(g.kcal, 0)}</td><td><input name="portions.${g.id}" inputmode="decimal" value="${plan.portions[g.id] ?? ''}" style="width:76px;padding:6px 8px;text-align:right" aria-label="Porciones de ${esc(g.name)}"></td></tr>`).join('')}</tbody></table></div>
+      <tbody>${db.groups.map(g => `<tr><td>${esc(g.name)}</td><td>${fmt(g.kcal, 0)}</td><td><input name="portions.${g.id}" inputmode="decimal" value="${String(plan.portions[g.id] ?? '').replace('.', ',')}" style="width:76px;padding:6px 8px;text-align:right" aria-label="Porciones de ${esc(g.name)}"></td></tr>`).join('')}</tbody></table></div>
       <div id="tot" style="margin-top:14px"></div>
     </section>
     <section class="card"><h2>3 · Reparto por comida</h2><p class="hint" style="margin-bottom:10px">Reparte las porciones de cada grupo entre las comidas. Se aceptan medias porciones (0,5).</p><div id="meals"></div></section>
@@ -671,7 +675,7 @@ function mealsHtml(plan) {
   const gs = db.groups.filter(g => plan.portions[g.id]);
   if (!gs.length) return '<p class="muted">Primero indica las porciones del día.</p>';
   return `<div class="tablewrap"><table class="mealgrid"><thead><tr><th>Grupo</th>${MEALS.map(([, l]) => `<th>${l.split(' / ')[0]}</th>`).join('')}<th>Repartidas</th></tr></thead><tbody>
-    ${gs.map(g => `<tr><td>${esc(g.name)}</td>${MEALS.map(([m, l]) => `<td><input name="meals.${m}.${g.id}" inputmode="decimal" value="${plan.meals[m]?.[g.id] ?? ''}" style="width:56px;padding:6px;text-align:right" aria-label="${esc(g.name)}, ${l}"></td>`).join('')}<td data-assigned="${g.id}"></td></tr>`).join('')}
+    ${gs.map(g => `<tr><td>${esc(g.name)}</td>${MEALS.map(([m, l]) => `<td><input name="meals.${m}.${g.id}" inputmode="decimal" value="${String(plan.meals[m]?.[g.id] ?? '').replace('.', ',')}" style="width:56px;padding:6px;text-align:right" aria-label="${esc(g.name)}, ${l}"></td>`).join('')}<td data-assigned="${g.id}"></td></tr>`).join('')}
     <tr><th>kcal por comida</th>${MEALS.map(([m]) => `<td data-mealkcal="${m}"></td>`).join('')}<td></td></tr>
   </tbody></table></div>`;
 }
@@ -682,7 +686,8 @@ function updatePlanUI(p, plan) {
   for (const g of db.groups) {
     const el = app.querySelector(`[data-assigned="${g.id}"]`); if (!el) continue;
     const got = MEALS.reduce((s, [m]) => s + (plan.meals[m]?.[g.id] || 0), 0), want = plan.portions[g.id] || 0;
-    el.innerHTML = `<span class="chip ${Math.abs(got - want) < .01 ? '' : 'warn'}">${fmt(got)} de ${fmt(want)}</span>`;
+    const over = got - want > .01;
+    el.innerHTML = `<span class="chip ${over ? 'err' : Math.abs(got - want) < .01 ? '' : 'warn'}">${fmt(got)} de ${fmt(want)}${over ? ` · sobran ${fmt(got - want)}` : ''}</span>`;
   }
   for (const [m] of MEALS) { const el = app.querySelector(`[data-mealkcal="${m}"]`); if (el) el.textContent = fmt(totals(plan.meals[m]).kcal, 0); }
 }
@@ -731,6 +736,18 @@ function route() {
   if (fp) {
     $('#meals').innerHTML = mealsHtml(ui.plan); updatePlanUI(p, ui.plan);
     fp.addEventListener('input', e => {
+      const [kind, meal, gid] = (e.target.name || '').split('.');
+      if (kind === 'meals') {
+        // no deja repartir más porciones de las que el grupo tiene en el día
+        const want = num(fp.elements['portions.' + gid].value) || 0;
+        const others = MEALS.reduce((s, [m]) => s + (m === meal ? 0 : num(fp.elements[`meals.${m}.${gid}`]?.value) || 0), 0);
+        const max = Math.max(0, want - others), v = num(e.target.value) || 0;
+        if (v > max + 1e-9) {
+          e.target.value = max ? String(max).replace('.', ',') : '';
+          toast(`Solo quedan ${fmt(max)} de ${fmt(want)} porciones de ${db.groups.find(g => g.id === gid).name.toLowerCase()}`);
+          e.target.classList.remove('over'); void e.target.offsetWidth; e.target.classList.add('over');
+        }
+      }
       ui.plan = readPlan(fp, ui.plan);
       if (e.target.name?.startsWith('portions.')) $('#meals').innerHTML = mealsHtml(ui.plan); // los grupos del reparto siguen a las porciones
       updatePlanUI(p, ui.plan);
@@ -777,6 +794,8 @@ app.addEventListener('submit', e => {
   if (f.id === 'fPlan') {
     const p = patient(id), plan = readPlan(f, ui.plan);
     if (!plan.date) return toast('Falta la fecha');
+    const over = db.groups.find(g => MEALS.reduce((s, [m]) => s + (plan.meals[m]?.[g.id] || 0), 0) - (plan.portions[g.id] || 0) > .01);
+    if (over) return toast(`Hay más porciones de ${over.name.toLowerCase()} repartidas que en el día. Corrígelo en el paso 3.`);
     p.plans ||= [];
     const i = p.plans.findIndex(x => x.id === plan.id);
     if (i >= 0) p.plans[i] = plan; else p.plans.push(plan);
