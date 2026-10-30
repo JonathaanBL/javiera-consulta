@@ -133,7 +133,12 @@ label.check input{width:22px;height:22px}
 .meal li{display:grid;gap:2px;padding-left:14px;border-left:3px solid var(--lime)}
 .meal li .muted{font-size:.9rem}
 .bul{margin:8px 0 0 20px;display:grid;gap:4px}
-@media print{.meal,.bul{break-inside:avoid}}
+.doc{display:grid;gap:22px}
+.por{font-size:.85rem;color:var(--muted);margin-top:6px}
+.eq{list-style:none;display:grid;gap:8px;margin-top:10px}
+.eq li{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:4px 14px;padding-bottom:8px;border-bottom:1px solid var(--line);font-size:.9rem}
+@media (max-width:560px){.eq li{grid-template-columns:1fr}}
+.foot{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
 .chart select{width:auto;margin-bottom:12px}
 
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));translate:-50% 0;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:999px;font-weight:600;z-index:20;transition:opacity .3s}
@@ -141,10 +146,22 @@ label.check input{width:22px;height:22px}
 
 /* informe para imprimir / guardar como PDF */
 @media print{
-  .top,.noprint{display:none!important}
+  .top,.noprint,.toast{display:none!important}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body{background:#fff}
-  main{padding:0}
-  .card{border:0;padding:0}
+  main{padding:0;display:block}
+  .card{border:0;padding:0;background:none}
+  .doc{font-size:14px;line-height:1.4}
+  .bul{gap:1px}
+  .doc .meal h2,.doc .sec h2{font-size:1.15rem}
+  /* en grid el navegador corta mal las páginas (títulos solos, textos encimados): al imprimir va en bloque */
+  .doc{display:block}
+  .doc>*+*{margin-top:18px}
+  h1,h2,.eqhead{break-after:avoid}
+  .eqhead{break-inside:avoid}
+  .meal,.sec,.eq li,.bul li,tr,.foot{break-inside:avoid}
+  .doc>*+*{margin-top:14px}
+  .tablewrap{overflow:visible}
 }
 </style>
 </head>
@@ -188,6 +205,12 @@ function migrate(d) {
     d.seed = 2;
   }
   if (d.seed < 3) { for (const g of d.groups) g.exBudget ??= BUDGET_EX()[g.id] || ''; d.seed = 3; }
+  if (d.seed < 4) { // corrige el ejemplo de lípidos para que calce con los gramos del menú, si Javiera no lo editó
+    const g = d.groups.find(x => x.id === 'lipidos');
+    if (g?.ex.startsWith('⅓ palta mediana · 25 g')) g.ex = LIPIDOS_EX();
+    if (g?.exBudget === '25 g de maní sin sal · ⅓ palta de temporada') g.exBudget = BUDGET_EX().lipidos;
+    d.seed = 4;
+  }
   return d;
 }
 function save() {
@@ -319,10 +342,11 @@ function GROUPS_SEED() {
     ['lacteosMG', 'Lácteos medios en grasa', 85, 5, 9, 3, '1 taza de leche semidescremada · 1 yogur semidescremado'],
     ['lacteosBG', 'Lácteos bajos en grasa', 70, 7, 10, 0, '1 taza de leche descremada · 1 yogur descremado · 1 rebanada gruesa de quesillo'],
     ['aceites', 'Aceites y grasas', 180, 0, 0, 20, '4 cucharaditas de aceite · 4 cucharaditas de mantequilla o mayonesa'],
-    ['lipidos', 'Alimentos ricos en lípidos', 175, 5, 5, 15, '⅓ palta mediana · 25 g de frutos secos (almendras, nueces, maní) · 2 cucharadas de semillas'],
+    ['lipidos', 'Alimentos ricos en lípidos', 175, 5, 5, 15, LIPIDOS_EX()],
     ['azucares', 'Azúcares', 20, 0, 5, 0, '1 cucharadita de azúcar, miel o mermelada']
   ].map(([id, name, kcal, p, c, g, ex]) => ({ id, name, kcal, p, c, g, ex, exBudget: BUDGET_EX()[id] }));
 }
+function LIPIDOS_EX() { return '½ palta (110 g) · 30 g de frutos secos (almendras, nueces, maní) · 2 cucharadas de semillas'; }
 // Ejemplos de bajo costo por grupo, para pautas económicas (función: se usa al cargar, antes que cualquier const de más abajo)
 function BUDGET_EX() { return {
   cereales: '¾ taza de arroz o fideos cocidos · 1 papa mediana · ½ taza de avena a granel · ½ marraqueta',
@@ -336,7 +360,7 @@ function BUDGET_EX() { return {
   lacteosMG: '1 taza de leche semidescremada · 1 yogur de pote grande servido en taza',
   lacteosBG: '1 taza de leche descremada (también en polvo) · 1 yogur descremado de pote grande servido en taza',
   aceites: '4 cucharaditas de aceite vegetal (maravilla o canola)',
-  lipidos: '25 g de maní sin sal · ⅓ palta de temporada',
+  lipidos: '30 g de maní sin sal · ½ palta de temporada (110 g)',
   azucares: '1 cucharadita de azúcar o mermelada'
 }; }
 const MEALS = [['desayuno', 'Desayuno'], ['col1', 'Colación AM'], ['almuerzo', 'Almuerzo'], ['col2', 'Colación PM / pre-entreno'], ['once', 'Once'], ['cena', 'Cena']];
@@ -737,9 +761,9 @@ function vReport(p) {
   const cs = sorted(p), first = cs[0], last = cs.at(-1);
   if (!last) return `<div class="empty">Este paciente aún no tiene controles.</div>`;
   const r0 = results(p, first), r1 = results(p, last);
-  const line = (l, a, b, u, d = 1) => `<tr><td>${l}</td><td>${fmt(a, d)}</td><td>${fmt(b, d)}</td><td>${a != null && b != null ? (b - a > 0 ? '+' : '') + fmt(b - a, d) : '—'} ${u}</td></tr>`;
+  const line = (l, a, b, u, d = 1) => a == null && b == null ? '' : `<tr><td>${l}</td><td>${fmt(a, d)}</td><td>${fmt(b, d)}</td><td>${a != null && b != null ? (b - a > 0 ? '+' : '') + fmt(b - a, d) : '—'} ${u}</td></tr>`;
   return `<div class="head noprint"><a class="btn ghost" href="#/p/${p.id}">← Volver</a><button class="btn" data-action="print">Imprimir o guardar PDF</button></div>
-  <article class="card" style="display:grid;gap:18px">
+  <article class="card doc">
     <div><p class="muted">Nta. Javiera · Nutrición deportiva</p><h1>Informe de evolución</h1>
       <p>${esc(p.name)} · ${fdate(first.date)} a ${fdate(last.date)} · ${cs.length} control${cs.length > 1 ? 'es' : ''}</p></div>
     <div class="tablewrap"><table><thead><tr><th>Medida</th><th>Inicio</th><th>Actual</th><th>Cambio</th></tr></thead><tbody>
@@ -752,11 +776,13 @@ function vReport(p) {
       ${line('Brazo contraído', first.circ?.brazoCon, last.circ?.brazoCon, 'cm')}
       ${line('Σ 6 pliegues', r0.sum6, r1.sum6, 'mm')}
     </tbody></table></div>
-    <div class="chart"><h2>Peso</h2>${chart(p, 'weight')}</div>
-    ${r1.fat != null ? `<div class="chart"><h2>% grasa</h2>${chart(p, 'fat')}</div>` : ''}
-    ${last.notes ? `<div><h2>Indicaciones</h2><p style="white-space:pre-wrap">${esc(last.notes)}</p></div>` : ''}
+    <div class="chart sec"><h2>Peso</h2>${chart(p, 'weight')}</div>
+    ${r1.fat != null ? `<div class="chart sec"><h2>% grasa</h2>${chart(p, 'fat')}</div>` : ''}
+    ${last.notes ? `<div class="sec"><h2>Indicaciones</h2><p style="white-space:pre-wrap">${esc(last.notes)}</p></div>` : ''}
+    ${FOOT}
   </article>`;
 }
+const FOOT = '<p class="foot">Nta. Javiera · Nutrición deportiva · Asesorías online · Instagram @nutricionista.javieralb</p>';
 
 function vFoods() {
   const list = db.foods.filter(f => f.name.toLowerCase().includes(ui.foodQ.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
@@ -923,23 +949,27 @@ function updatePlanUI(p, plan) {
 function vPlanPrint(p, plan) {
   const w = sorted(p).at(-1)?.weight;
   const lines = s => (s || '').split('\n').map(x => x.trim()).filter(Boolean);
-  const list = (title, s) => lines(s).length ? `<div><h2>${title}</h2><ul class="bul">${lines(s).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+  const list = (title, s) => lines(s).length ? `<div class="sec"><h2>${title}</h2><ul class="bul">${lines(s).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
   const meals = MEALS.filter(([m]) => Object.keys(plan.meals[m] || {}).length || plan.menu?.[m]);
   const hasControls = (p.controls || []).length > 0;
+  const usedGroups = db.groups.filter(g => MEALS.some(([m]) => plan.meals[m]?.[g.id]));
   return `<div class="head noprint"><a class="btn ghost" href="#/p/${p.id}">← Volver</a>
     <div class="actions"><a class="btn ghost" href="#/p/${p.id}/pauta/${plan.id}">Editar</a><button class="btn" data-action="print">Imprimir pauta</button>
       ${hasControls ? '<button class="btn lime" data-action="printAll">Imprimir pauta + evolución</button>' : ''}</div></div>
-  <article class="card" style="display:grid;gap:22px">
+  <article class="card doc">
     <div><p class="muted">Nta. Javiera · Nutrición deportiva</p><h1>Tu pauta alimentaria</h1>
       <p>${esc(p.name)} · ${fdate(plan.date)}${plan.showKcal ? ` · ${fmt(totals(plan.portions).kcal, 0)} kcal aprox. al día` : ''}</p></div>
-    ${meals.length ? meals.map(([m, l]) => `<div class="meal"><h2>${l}</h2>${plan.menu?.[m] ? `<p class="menu">${esc(plan.menu[m])}</p>` : ''}<ul>${Object.entries(plan.meals[m] || {}).map(([gid, n]) => {
-      const g = db.groups.find(x => x.id === gid);
-      return g ? `<li><b>${fmt(n)} ${n <= 1 ? 'porción' : 'porciones'} de ${esc(g.name.toLowerCase())}</b><span class="muted">${esc(plan.budget && g.exBudget ? g.exBudget : g.ex)}</span></li>` : '';
-    }).join('')}</ul></div>`).join('') : '<p class="muted noprint">Esta pauta aún no tiene porciones repartidas por comida.</p>'}
+    ${meals.length ? meals.map(([m, l]) => {
+      const por = Object.entries(plan.meals[m] || {}).map(([gid, n]) => { const g = db.groups.find(x => x.id === gid); return g ? `${fmt(n)} ${n <= 1 ? 'porción' : 'porciones'} de ${esc(g.name.toLowerCase())}` : ''; }).filter(Boolean).join(' · ');
+      return `<div class="meal"><h2>${l}</h2>${plan.menu?.[m] ? `<p class="menu">${esc(plan.menu[m])}</p>` : ''}${por ? `<p class="por">${por}</p>` : ''}</div>`;
+    }).join('') : '<p class="muted noprint">Esta pauta aún no tiene porciones repartidas por comida.</p>'}
+    ${usedGroups.length ? `<div><div class="eqhead"><h2>Equivalencias: qué cuenta como 1 porción</h2><p class="hint">Puedes cambiar un alimento por otro del mismo grupo.</p></div><ul class="eq">${usedGroups.map(g =>
+      `<li><b>${esc(g.name)}</b><span>${esc(plan.budget && g.exBudget ? g.exBudget : g.ex)}</span></li>`).join('')}</ul></div>` : ''}
     ${list('Preferir', plan.prefer)}${list('Evitar o limitar', plan.avoid)}
-    ${w ? `<div><h2>Hidratación</h2><p>Alrededor de ${fmt(w * .035)} litros de agua al día, y más los días que entrenas o hace calor.</p></div>` : ''}
-    ${plan.activity ? `<div><h2>Actividad física y entrenamiento</h2><p style="white-space:pre-wrap">${esc(plan.activity)}</p></div>` : ''}
-    ${plan.notes ? `<div><h2>Otras indicaciones</h2><p style="white-space:pre-wrap">${esc(plan.notes)}</p></div>` : ''}
+    ${w ? `<div class="sec"><h2>Hidratación</h2><p>Alrededor de ${fmt(w * .035)} litros de agua al día, y más los días que entrenas o hace calor.</p></div>` : ''}
+    ${plan.activity ? `<div class="sec"><h2>Actividad física y entrenamiento</h2><p style="white-space:pre-wrap">${esc(plan.activity)}</p></div>` : ''}
+    ${plan.notes ? `<div class="sec"><h2>Otras indicaciones</h2><p style="white-space:pre-wrap">${esc(plan.notes)}</p></div>` : ''}
+    ${FOOT}
   </article>
   ${hasControls ? `<div class="report-extra">${vReport(p)}</div>` : ''}`;
 }
