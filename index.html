@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Consulta · Nta. Javiera</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F3EEE3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Consulta">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..500&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* Herramienta de consulta: lista → ficha → control. Colores y letras de la web de Javiera. */
+:root{
+  --bg:#F3EEE3; --card:#FFFDF8; --ink:#10241B; --green:#1F4D3A; --lime:#C8E25B; --papaya:#E8622C;
+  --muted:#5B6A61; --line:#E2DACB; --soft:#EAF3C6; --warn:#FBE3D6; --ok:#DDEFD9;
+  --display:Fraunces,Georgia,serif; --body:Manrope,system-ui,-apple-system,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--body);-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom)}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--papaya);outline-offset:2px;border-radius:6px}
+h1,h2,h3{font-family:var(--display);font-weight:450;line-height:1.15;text-wrap:balance}
+h1{font-size:clamp(1.7rem,4vw,2.3rem)}
+h2{font-size:1.3rem}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+.top{position:sticky;top:0;z-index:5;background:rgba(243,238,227,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left))}
+.top .in{max-width:1080px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-family:var(--display);font-size:1.15rem;text-decoration:none;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.brand i{width:11px;height:11px;border-radius:50% 0;background:var(--green);transform:rotate(45deg)}
+.tabs{display:flex;gap:4px;overflow-x:auto}
+.tabs a{text-decoration:none;font-weight:600;font-size:.9rem;padding:8px 12px;border-radius:999px;white-space:nowrap}
+.tabs a[aria-current]{background:var(--ink);color:var(--bg)}
+@media (max-width:420px){.brand span{display:none}.tabs a{padding:8px 10px}}
+
+main{max-width:1080px;margin:auto;padding:24px max(16px,env(safe-area-inset-right)) 64px max(16px,env(safe-area-inset-left));display:grid;gap:20px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.head p{margin-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;min-width:0}
+.card h2{margin-bottom:12px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;cursor:pointer;text-decoration:none;font-weight:700;font-size:.95rem;padding:11px 18px;border-radius:999px;background:var(--ink);color:var(--bg)}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
+.btn.lime{background:var(--lime);color:var(--ink)}
+.btn.danger{background:transparent;color:#B3261E;box-shadow:inset 0 0 0 1.5px #B3261E}
+.btn.sm{padding:7px 12px;font-size:.85rem}
+.btn[hidden]{display:none}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+
+.search{width:100%;padding:13px 16px;border-radius:14px;border:1px solid var(--line);background:var(--card)}
+.list{list-style:none;display:grid;gap:8px}
+.list a{display:grid;grid-template-columns:1fr auto;gap:4px 12px;text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.list a:hover{border-color:var(--green)}
+.list b{font-weight:700}
+.list small{color:var(--muted)}
+.list .r{text-align:right}
+.empty{padding:28px;text-align:center;color:var(--muted);border:1.5px dashed var(--line);border-radius:18px}
+
+.banner{padding:12px 16px;border-radius:14px;background:var(--warn);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+
+/* formularios */
+form{display:grid;gap:20px}
+fieldset{border:0;display:grid;gap:12px}
+legend{font-family:var(--display);font-size:1.2rem;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+label{display:grid;gap:4px;font-size:.85rem;font-weight:600;color:var(--muted)}
+label span.u{font-weight:400}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font-size:16px;font-weight:500}
+textarea{min-height:80px;resize:vertical}
+.hint{font-size:.82rem;color:var(--muted)}
+.split{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px;align-items:start}
+.sticky{position:sticky;top:90px}
+@media (max-width:820px){.split{grid-template-columns:1fr}.sticky{position:static}}
+
+/* resultados */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.tile small{display:block;color:var(--muted);font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.tile strong{display:block;font-family:var(--display);font-size:1.6rem;font-weight:450;margin:2px 0;font-variant-numeric:tabular-nums}
+.tile em{font-style:normal;font-size:.8rem;font-weight:700}
+.tile em.up{color:#9A3412}.tile em.down{color:#1F6B3A}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:700;background:var(--soft)}
+.chip.warn{background:var(--warn)}
+.res{display:grid;gap:8px}
+.res div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.res div:last-child{border:0;padding:0}
+.res dt{color:var(--muted)}
+.res dd{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.92rem}
+th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+
+.chart svg{width:100%;height:auto;display:block}
+.chart select{width:auto;margin-bottom:12px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));translate:-50% 0;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:999px;font-weight:600;z-index:20;transition:opacity .3s}
+.toast[hidden]{display:block;opacity:0;pointer-events:none}
+
+/* informe para imprimir / guardar como PDF */
+@media print{
+  .top,.noprint{display:none!important}
+  body{background:#fff}
+  main{padding:0}
+  .card{border:0;padding:0}
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="#/" aria-label="Consulta, inicio"><i></i><span>Consulta</span></a>
+  <nav class="tabs" aria-label="Secciones">
+    <a href="#/" data-tab="p">Pacientes</a><a href="#/alimentos" data-tab="alimentos">Alimentos</a><a href="#/respaldo" data-tab="respaldo">Respaldo</a>
+  </nav>
+</div></header>
+<main id="app"></main>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+// ---------- utilidades ----------
+const $ = s => document.querySelector(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// el teclado del iPhone en Chile escribe coma decimal
+const num = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
+const fmt = (n, d = 1) => n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('es-CL', { maximumFractionDigits: d, minimumFractionDigits: 0 });
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const fdate = s => s ? new Date(s + 'T12:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => t.hidden = true, 2200); }
+
+// ---------- datos (solo en este equipo) ----------
+const KEY = 'consulta-v1';
+let db = load();
+function load() {
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.patients)) return d; } catch {}
+  return { patients: [], foods: FOODS_SEED(), lastBackup: null };
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
+  catch { alert('No se pudo guardar. El almacenamiento del equipo podría estar lleno: descarga un respaldo.'); return false; }
+}
+navigator.storage?.persist?.();
+const patient = id => db.patients.find(p => p.id === id);
+const sorted = p => [...(p.controls || [])].sort((a, b) => a.date.localeCompare(b.date));
+
+// ---------- cálculos ----------
+const CIRC = [['brazoRel', 'Brazo relajado'], ['brazoCon', 'Brazo contraído'], ['cintura', 'Cintura'], ['cadera', 'Cadera'], ['muslo', 'Muslo medio'], ['pantorrilla', 'Pantorrilla']];
+const FOLDS = [['triceps', 'Tríceps'], ['biceps', 'Bíceps'], ['subescapular', 'Subescapular'], ['cresta', 'Cresta ilíaca'], ['supraespinal', 'Supraespinal'], ['abdominal', 'Abdominal'], ['muslo', 'Muslo frontal'], ['pantorrilla', 'Pantorrilla medial']];
+const SUM6 = ['triceps', 'subescapular', 'supraespinal', 'abdominal', 'muslo', 'pantorrilla']; // suma de 6 pliegues ISAK
+const DW4 = ['biceps', 'triceps', 'subescapular', 'cresta'];
+const ACTIVITY = [[1.2, 'Sedentaria'], [1.375, 'Ligera (1–3 días/sem)'], [1.55, 'Moderada (3–5 días/sem)'], [1.725, 'Alta (6–7 días/sem)'], [1.9, 'Muy alta (2 veces al día)']];
+// Durnin & Womersley (1974): [edad desde, c, m] → densidad = c − m·log10(Σ4 pliegues)
+const DW = {
+  M: [[17, 1.1620, .0630], [20, 1.1631, .0632], [30, 1.1422, .0544], [40, 1.1620, .0700], [50, 1.1715, .0779]],
+  F: [[16, 1.1549, .0678], [20, 1.1599, .0717], [30, 1.1423, .0632], [40, 1.1333, .0612], [50, 1.1339, .0645]]
+};
+function ageAt(birth, date) {
+  if (!birth || !date) return null;
+  const b = new Date(birth + 'T12:00'), d = new Date(date + 'T12:00');
+  let a = d.getFullYear() - b.getFullYear();
+  if (d.getMonth() < b.getMonth() || (d.getMonth() === b.getMonth() && d.getDate() < b.getDate())) a--;
+  return a;
+}
+const sumOf = (f, keys) => keys.every(k => f?.[k] > 0) ? keys.reduce((s, k) => s + f[k], 0) : null;
+const bmi = (w, h) => w && h ? w / (h / 100) ** 2 : null;
+function bmiClass(b, a) {
+  if (b == null || a == null || a < 18) return null; // en menores se usa IMC/edad (z-score), no estos cortes
+  if (a >= 65) return b < 23 ? 'Bajo peso' : b < 28 ? 'Normal' : b < 32 ? 'Sobrepeso' : 'Obesidad'; // MINSAL adulto mayor
+  return b < 18.5 ? 'Bajo peso' : b < 25 ? 'Normal' : b < 30 ? 'Sobrepeso' : b < 35 ? 'Obesidad I' : b < 40 ? 'Obesidad II' : 'Obesidad III'; // OMS
+}
+function fatPct(sex, a, f) {
+  const s = sumOf(f, DW4);
+  if (!s || a == null || !DW[sex]) return null;
+  const [, c, m] = DW[sex].filter(r => a >= r[0]).pop() || DW[sex][0];
+  return 495 / (c - m * Math.log10(s)) - 450; // Siri
+}
+const mifflin = (sex, w, h, a) => w && h && a != null ? 10 * w + 6.25 * h - 5 * a + (sex === 'M' ? 5 : -161) : null;
+function results(p, c) {
+  const a = ageAt(p.birth, c.date), f = c.folds || {}, ci = c.circ || {}, w = c.weight, h = c.height;
+  const imc = bmi(w, h), fat = fatPct(p.sex, a, f), bmr = mifflin(p.sex, w, h, a);
+  return {
+    age: a, imc, imcClass: bmiClass(imc, a), fat,
+    fatKg: fat != null && w ? w * fat / 100 : null, leanKg: fat != null && w ? w * (1 - fat / 100) : null,
+    sum6: sumOf(f, SUM6), sum8: sumOf(f, FOLDS.map(x => x[0])),
+    icc: ci.cintura && ci.cadera ? ci.cintura / ci.cadera : null,
+    ict: ci.cintura && h ? ci.cintura / h : null,
+    waistRisk: ci.cintura ? (ci.cintura >= (p.sex === 'M' ? 102 : 88) ? 'Riesgo alto' : ci.cintura >= (p.sex === 'M' ? 94 : 80) ? 'Riesgo aumentado' : 'Sin riesgo') : null,
+    bmr, tdee: bmr && c.activity ? bmr * c.activity : null
+  };
+}
+// autocomprobación de fórmulas (ver consola)
+console.assert(Math.abs(fatPct('M', 25, { biceps: 10, triceps: 10, subescapular: 10, cresta: 10 }) - 16.2) < .1, 'Durnin-Womersley');
+console.assert(Math.round(bmi(70, 175) * 10) === 229, 'IMC');
+console.assert(ageAt('2000-06-15', '2026-06-14') === 25 && ageAt('2000-06-15', '2026-06-15') === 26, 'edad');
+console.assert(Math.round(mifflin('F', 60, 165, 30)) === 1320, 'Mifflin');
+console.assert(num('72,5') === 72.5, 'coma decimal');
+
+// ---------- alimentos ----------
+// Valores aproximados por 100 g (referencia USDA). Javiera puede editarlos según su tabla.
+function FOODS_SEED() {
+  return [
+    ['Arroz blanco cocido', 130, 2.7, 28, .3], ['Fideos cocidos', 158, 5.8, 31, .9], ['Papa cocida', 87, 1.9, 20, .1],
+    ['Pan blanco (marraqueta)', 270, 8.5, 56, 1.5], ['Pan integral', 247, 13, 41, 3.4], ['Avena', 389, 16.9, 66, 6.9],
+    ['Lentejas cocidas', 116, 9, 20, .4], ['Porotos cocidos', 127, 8.7, 22.8, .5], ['Garbanzos cocidos', 164, 8.9, 27.4, 2.6],
+    ['Pechuga de pollo cocida', 165, 31, 0, 3.6], ['Huevo entero', 143, 12.6, .7, 9.5], ['Vacuno magro cocido', 200, 29, 0, 9],
+    ['Salmón cocido', 206, 22, 0, 12], ['Atún en agua', 116, 25.5, 0, .8], ['Leche descremada', 34, 3.4, 5, .1],
+    ['Leche entera', 61, 3.2, 4.8, 3.3], ['Yogur natural', 61, 3.5, 4.7, 3.3], ['Quesillo', 110, 12, 3, 5],
+    ['Queso gauda', 356, 25, 2.2, 27], ['Palta', 160, 2, 8.5, 14.7], ['Aceite de oliva', 884, 0, 0, 100],
+    ['Almendras', 579, 21, 22, 50], ['Maní', 567, 26, 16, 49], ['Mantequilla de maní', 588, 25, 20, 50],
+    ['Plátano', 89, 1.1, 23, .3], ['Manzana', 52, .3, 14, .2], ['Naranja', 47, .9, 12, .1], ['Frutillas', 32, .7, 7.7, .3],
+    ['Tomate', 18, .9, 3.9, .2], ['Lechuga', 15, 1.4, 2.9, .2], ['Zanahoria', 41, .9, 9.6, .2], ['Brócoli', 34, 2.8, 6.6, .4],
+    ['Azúcar', 387, 0, 100, 0]
+  ].map(([name, kcal, p, c, g]) => ({ id: uid(), name, kcal, p, c, g }));
+}
+
+// ---------- gráfico de evolución (SVG) ----------
+const METRICS = {
+  weight: ['Peso', 'kg', (p, c) => c.weight], imc: ['IMC', 'kg/m²', (p, c) => results(p, c).imc],
+  fat: ['% grasa', '%', (p, c) => results(p, c).fat], cintura: ['Cintura', 'cm', (p, c) => c.circ?.cintura],
+  sum6: ['Σ 6 pliegues', 'mm', (p, c) => results(p, c).sum6], brazoCon: ['Brazo contraído', 'cm', (p, c) => c.circ?.brazoCon]
+};
+function chart(p, key) {
+  const [label, unit, get] = METRICS[key];
+  const pts = sorted(p).map(c => ({ t: new Date(c.date + 'T12:00').getTime(), y: get(p, c), d: c.date })).filter(x => x.y != null);
+  if (pts.length < 2) return `<p class="muted">Se necesitan al menos 2 controles con ${label.toLowerCase()} para ver la evolución.</p>`;
+  const W = 640, H = 230, L = 46, R = 16, T = 18, B = 34;
+  const ys = pts.map(x => x.y), lo = Math.min(...ys), hi = Math.max(...ys), pad = (hi - lo) * .15 || 1;
+  const y0 = lo - pad, y1 = hi + pad, t0 = pts[0].t, t1 = pts.at(-1).t || t0 + 1;
+  const X = t => L + (t - t0) / ((t1 - t0) || 1) * (W - L - R), Y = y => T + (1 - (y - y0) / (y1 - y0)) * (H - T - B);
+  const ticks = [y0 + pad, (lo + hi) / 2, y1 - pad];
+  const line = pts.map(x => `${X(x.t).toFixed(1)},${Y(x.y).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${label} en el tiempo">
+    ${ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#E2DACB"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="#5B6A61">${fmt(v)}</text>`).join('')}
+    <polygon points="${X(t0)},${H - B} ${line} ${X(pts.at(-1).t)},${H - B}" fill="#C8E25B" opacity=".25"/>
+    <polyline points="${line}" fill="none" stroke="#1F4D3A" stroke-width="2.5" stroke-linejoin="round"/>
+    ${pts.map((x, i) => `<circle cx="${X(x.t)}" cy="${Y(x.y)}" r="${i === pts.length - 1 ? 6 : 4}" fill="${i === pts.length - 1 ? '#E8622C' : '#1F4D3A'}" stroke="#fff" stroke-width="2"><title>${fdate(x.d)}: ${fmt(x.y)} ${unit}</title></circle>`).join('')}
+    <text x="${X(pts.at(-1).t)}" y="${Y(pts.at(-1).y) - 12}" text-anchor="end" font-size="13" font-weight="700" fill="#10241B">${fmt(pts.at(-1).y)} ${unit}</text>
+    <text x="${L}" y="${H - 10}" font-size="11" fill="#5B6A61">${fdate(pts[0].d)}</text>
+    <text x="${W - R}" y="${H - 10}" font-size="11" fill="#5B6A61" text-anchor="end">${fdate(pts.at(-1).d)}</text>
+  </svg>`;
+}
+
+// ---------- vistas ----------
+const app = $('#app');
+let ui = { q: '', metric: 'weight', foodQ: '' };
+
+function backupBanner() {
+  if (!db.patients.length) return '';
+  const days = db.lastBackup ? Math.floor((Date.now() - db.lastBackup) / 864e5) : null;
+  if (days != null && days < 14) return '';
+  return `<div class="banner"><span>${days == null ? 'Aún no has descargado un respaldo.' : `Tu último respaldo fue hace ${days} días.`} Los datos viven solo en este equipo.</span><a class="btn sm" href="#/respaldo">Hacer respaldo</a></div>`;
+}
+
+function vList() {
+  const last = p => sorted(p).at(-1);
+  const rows = db.patients
+    .filter(p => p.name.toLowerCase().includes(ui.q.toLowerCase()))
+    .sort((a, b) => (last(b)?.date || '').localeCompare(last(a)?.date || '') || a.name.localeCompare(b.name))
+    .map(p => { const c = last(p); return `<li><a href="#/p/${p.id}"><b>${esc(p.name)}</b><span class="r num">${c ? fmt(c.weight) + ' kg' : ''}</span>
+      <small>${p.birth ? ageAt(p.birth, today()) + ' años · ' : ''}${esc(p.goal || 'Sin objetivo registrado')}</small><small class="r">${c ? 'Último control ' + fdate(c.date) : 'Sin controles'}</small></a></li>`; }).join('');
+  return `<div class="head"><div><h1>Pacientes</h1><p class="muted">${db.patients.length} en total</p></div><a class="btn" href="#/nuevo">+ Nuevo paciente</a></div>
+    ${backupBanner()}
+    ${db.patients.length ? `<input id="q" class="search" type="search" placeholder="Buscar por nombre" value="${esc(ui.q)}" aria-label="Buscar paciente">
+    <ul class="list">${rows || '<li class="empty">Nadie coincide con la búsqueda.</li>'}</ul>`
+    : `<div class="empty">Aún no hay pacientes. Agrega el primero con «Nuevo paciente».</div>`}`;
+}
+
+function vPatientForm(p) {
+  const v = p || { sex: 'F' };
+  return `<div class="head"><h1>${p ? 'Editar paciente' : 'Nuevo paciente'}</h1></div>
+  <form class="card" id="fPatient">
+    <div class="grid">
+      <label style="grid-column:1/-1">Nombre completo<input name="name" required value="${esc(v.name)}" autocomplete="off"></label>
+      <label>Sexo (para las fórmulas)<select name="sex"><option value="F" ${v.sex === 'F' ? 'selected' : ''}>Femenino</option><option value="M" ${v.sex === 'M' ? 'selected' : ''}>Masculino</option></select></label>
+      <label>Fecha de nacimiento<input name="birth" type="date" value="${esc(v.birth)}" max="${today()}"></label>
+      <label>Teléfono<input name="phone" type="tel" value="${esc(v.phone)}"></label>
+      <label>Deporte / actividad<input name="sport" value="${esc(v.sport)}" placeholder="Ej: running, crossfit"></label>
+      <label style="grid-column:1/-1">Objetivo<input name="goal" value="${esc(v.goal)}" placeholder="Ej: bajar grasa manteniendo masa muscular"></label>
+      <label style="grid-column:1/-1">Notas clínicas (alergias, patologías, medicamentos, preferencias)<textarea name="notes">${esc(v.notes)}</textarea></label>
+    </div>
+    <div class="actions"><button class="btn">Guardar</button><a class="btn ghost" href="${p ? '#/p/' + p.id : '#/'}">Cancelar</a>
+      ${p ? '<button type="button" class="btn danger" data-action="delPatient">Eliminar paciente</button>' : ''}</div>
+  </form>`;
+}
+
+function tile(label, val, unit, prev, extra = '', lowerIsBetter = true, d = 1) {
+  let delta = '';
+  if (val != null && prev != null && Math.abs(val - prev) >= .05) {
+    const diff = val - prev, good = lowerIsBetter ? diff < 0 : diff > 0;
+    delta = `<em class="${good ? 'down' : 'up'}">${diff > 0 ? '▲' : '▼'} ${fmt(Math.abs(diff), d)} ${unit}</em>`;
+  }
+  return `<div class="tile"><small>${label}</small><strong>${fmt(val, d)}${val != null && unit ? ` <span style="font-size:.55em">${unit}</span>` : ''}</strong>${delta} ${extra}</div>`;
+}
+
+function vPatient(p) {
+  const cs = sorted(p), c = cs.at(-1), prev = cs.at(-2);
+  const r = c ? results(p, c) : null, rp = prev ? results(p, prev) : null;
+  const age = ageAt(p.birth, today());
+  return `<div class="head"><div><h1>${esc(p.name)}</h1>
+      <p class="muted">${[p.sex === 'M' ? 'Masculino' : 'Femenino', age != null ? age + ' años' : null, p.sport, p.phone].filter(Boolean).map(esc).join(' · ')}</p></div>
+    <div class="actions"><a class="btn" href="#/p/${p.id}/control">+ Nuevo control</a><a class="btn ghost" href="#/p/${p.id}/informe">Informe</a><a class="btn ghost" href="#/p/${p.id}/editar">Editar</a></div></div>
+  ${p.goal || p.notes ? `<div class="card">${p.goal ? `<p><b>Objetivo:</b> ${esc(p.goal)}</p>` : ''}${p.notes ? `<p class="muted" style="margin-top:6px;white-space:pre-wrap">${esc(p.notes)}</p>` : ''}</div>` : ''}
+  ${c ? `<section><p class="muted" style="margin-bottom:10px">Último control: ${fdate(c.date)}${prev ? ` · comparado con ${fdate(prev.date)}` : ''}</p>
+    <div class="tiles">
+      ${tile('Peso', c.weight, 'kg', prev?.weight)}
+      ${tile('IMC', r.imc, '', rp?.imc, r.imcClass ? `<span class="chip ${r.imcClass === 'Normal' ? '' : 'warn'}">${r.imcClass}</span>` : '')}
+      ${tile('% grasa', r.fat, '%', rp?.fat)}
+      ${tile('Masa magra', r.leanKg, 'kg', rp?.leanKg, '', false)}
+      ${tile('Cintura', c.circ?.cintura, 'cm', prev?.circ?.cintura, r.waistRisk && r.waistRisk !== 'Sin riesgo' ? `<span class="chip warn">${r.waistRisk}</span>` : '')}
+      ${tile('Σ 6 pliegues', r.sum6, 'mm', rp?.sum6)}
+      ${tile('Gasto diario', r.tdee, 'kcal', null, '', true, 0)}
+    </div></section>
+  <section class="card chart"><h2>Evolución</h2>
+    <select id="metric" aria-label="Medida a graficar">${Object.entries(METRICS).map(([k, [l]]) => `<option value="${k}" ${k === ui.metric ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <div id="chart">${chart(p, ui.metric)}</div></section>
+  <section class="card"><h2>Controles</h2><div class="tablewrap"><table>
+    <thead><tr><th>Fecha</th><th>Peso kg</th><th>IMC</th><th>% grasa</th><th>Cintura cm</th><th>Σ6 mm</th><th></th></tr></thead>
+    <tbody>${[...cs].reverse().map(x => { const rx = results(p, x); return `<tr><td>${fdate(x.date)}</td><td>${fmt(x.weight)}</td><td>${fmt(rx.imc)}</td><td>${fmt(rx.fat)}</td><td>${fmt(x.circ?.cintura)}</td><td>${fmt(rx.sum6)}</td><td><a class="btn sm ghost" href="#/p/${p.id}/control/${x.id}">Ver / editar</a></td></tr>`; }).join('')}</tbody>
+  </table></div></section>`
+  : `<div class="empty">Todavía no hay controles. Registra el primero con «Nuevo control».</div>`}`;
+}
+
+function field(group, key, label, unit, val) {
+  return `<label>${label} <span class="u">(${unit})</span><input name="${group ? group + '.' : ''}${key}" inputmode="decimal" value="${val ?? ''}" autocomplete="off"></label>`;
+}
+
+function vControl(p, c) {
+  const last = sorted(p).at(-1);
+  const v = c || { date: today(), height: last?.height, activity: last?.activity || 1.55 };
+  return `<div class="head"><div><h1>${c ? 'Control del ' + fdate(c.date) : 'Nuevo control'}</h1><p class="muted">${esc(p.name)}</p></div></div>
+  <div class="split">
+    <form class="card" id="fControl">
+      <fieldset><legend>Básicos</legend><div class="grid">
+        <label>Fecha<input name="date" type="date" required value="${v.date}"></label>
+        ${field('', 'weight', 'Peso', 'kg', v.weight)}
+        ${field('', 'height', 'Talla', 'cm', v.height)}
+        <label>Actividad física<select name="activity">${ACTIVITY.map(([f, l]) => `<option value="${f}" ${f == v.activity ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      </div></fieldset>
+      <fieldset><legend>Perímetros</legend><div class="grid">${CIRC.map(([k, l]) => field('circ', k, l, 'cm', v.circ?.[k])).join('')}</div></fieldset>
+      <fieldset><legend>Pliegues cutáneos</legend><p class="hint">Para el % de grasa se usan bíceps, tríceps, subescapular y cresta ilíaca. Para la Σ6 ISAK: tríceps, subescapular, supraespinal, abdominal, muslo y pantorrilla.</p>
+        <div class="grid">${FOLDS.map(([k, l]) => field('folds', k, l, 'mm', v.folds?.[k])).join('')}</div></fieldset>
+      <fieldset><legend>Notas del control</legend><textarea name="notes" placeholder="Adherencia, síntomas, cambios en el plan…">${esc(v.notes)}</textarea></fieldset>
+      <div class="actions"><button class="btn">Guardar control</button><a class="btn ghost" href="#/p/${p.id}">Cancelar</a>
+        ${c ? `<button type="button" class="btn danger" data-action="delControl">Eliminar control</button>` : ''}</div>
+    </form>
+    <aside class="card sticky" aria-live="polite"><h2>Resultados</h2><div id="live"></div></aside>
+  </div>`;
+}
+
+function readControl(form) {
+  const fd = new FormData(form), c = { circ: {}, folds: {} };
+  for (const [k, v] of fd) {
+    const [g, key] = k.split('.');
+    if (key) { const n = num(v); if (n != null) c[g][key] = n; }
+    else c[k] = k === 'date' || k === 'notes' ? v : num(v);
+  }
+  return c;
+}
+
+function liveResults(p, c) {
+  const r = results(p, c);
+  const row = (dt, dd) => `<div><dt>${dt}</dt><dd>${dd}</dd></div>`;
+  return `<dl class="res">
+    ${row('Edad', r.age != null ? r.age + ' años' : 'Falta fecha de nacimiento')}
+    ${row('IMC', fmt(r.imc) + (r.imcClass ? ` <span class="chip">${r.imcClass}</span>` : ''))}
+    ${row('% grasa (Durnin-Womersley)', r.fat != null ? fmt(r.fat) + ' %' : '<span class="muted">Faltan 4 pliegues</span>')}
+    ${row('Masa grasa', r.fatKg != null ? fmt(r.fatKg) + ' kg' : '—')}
+    ${row('Masa magra', r.leanKg != null ? fmt(r.leanKg) + ' kg' : '—')}
+    ${row('Σ 6 pliegues', r.sum6 != null ? fmt(r.sum6) + ' mm' : '—')}
+    ${row('Σ 8 pliegues', r.sum8 != null ? fmt(r.sum8) + ' mm' : '—')}
+    ${row('Cintura / cadera', fmt(r.icc, 2))}
+    ${row('Cintura / talla', r.ict != null ? fmt(r.ict, 2) + (r.ict >= .5 ? ' <span class="chip warn">≥ 0,5</span>' : '') : '—')}
+    ${row('Riesgo por cintura', r.waistRisk || '—')}
+    ${row('Metabolismo basal (Mifflin)', r.bmr ? fmt(r.bmr, 0) + ' kcal' : '—')}
+    ${row('Gasto total diario', r.tdee ? fmt(r.tdee, 0) + ' kcal' : '—')}
+  </dl>`;
+}
+
+function vReport(p) {
+  const cs = sorted(p), first = cs[0], last = cs.at(-1);
+  if (!last) return `<div class="empty">Este paciente aún no tiene controles.</div>`;
+  const r0 = results(p, first), r1 = results(p, last);
+  const line = (l, a, b, u, d = 1) => `<tr><td>${l}</td><td>${fmt(a, d)}</td><td>${fmt(b, d)}</td><td>${a != null && b != null ? (b - a > 0 ? '+' : '') + fmt(b - a, d) : '—'} ${u}</td></tr>`;
+  return `<div class="head noprint"><a class="btn ghost" href="#/p/${p.id}">← Volver</a><button class="btn" data-action="print">Imprimir o guardar PDF</button></div>
+  <article class="card" style="display:grid;gap:18px">
+    <div><p class="muted">Nta. Javiera · Nutrición deportiva</p><h1>Informe de evolución</h1>
+      <p>${esc(p.name)} · ${fdate(first.date)} a ${fdate(last.date)} · ${cs.length} control${cs.length > 1 ? 'es' : ''}</p></div>
+    <div class="tablewrap"><table><thead><tr><th>Medida</th><th>Inicio</th><th>Actual</th><th>Cambio</th></tr></thead><tbody>
+      ${line('Peso', first.weight, last.weight, 'kg')}
+      ${line('IMC', r0.imc, r1.imc, '')}
+      ${line('% grasa', r0.fat, r1.fat, '%')}
+      ${line('Masa magra', r0.leanKg, r1.leanKg, 'kg')}
+      ${line('Cintura', first.circ?.cintura, last.circ?.cintura, 'cm')}
+      ${line('Cadera', first.circ?.cadera, last.circ?.cadera, 'cm')}
+      ${line('Brazo contraído', first.circ?.brazoCon, last.circ?.brazoCon, 'cm')}
+      ${line('Σ 6 pliegues', r0.sum6, r1.sum6, 'mm')}
+    </tbody></table></div>
+    <div class="chart"><h2>Peso</h2>${chart(p, 'weight')}</div>
+    ${r1.fat != null ? `<div class="chart"><h2>% grasa</h2>${chart(p, 'fat')}</div>` : ''}
+    ${last.notes ? `<div><h2>Indicaciones</h2><p style="white-space:pre-wrap">${esc(last.notes)}</p></div>` : ''}
+  </article>`;
+}
+
+function vFoods() {
+  const list = db.foods.filter(f => f.name.toLowerCase().includes(ui.foodQ.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
+  return `<div class="head"><div><h1>Alimentos</h1><p class="muted">Calorías y macronutrientes por 100 g. Calcula una porción escribiendo los gramos.</p></div></div>
+  <div class="banner" style="background:var(--soft)"><span>Los valores que vienen cargados son aproximados (referencia USDA). Edítalos según tu tabla de composición, por ejemplo la del INTA.</span></div>
+  <input id="foodQ" class="search" type="search" placeholder="Buscar alimento" value="${esc(ui.foodQ)}" aria-label="Buscar alimento">
+  <div class="card tablewrap"><table>
+    <thead><tr><th>Alimento</th><th>Gramos</th><th>kcal</th><th>Proteínas g</th><th>Carbohidratos g</th><th>Grasas g</th><th></th></tr></thead>
+    <tbody>${list.map(f => `<tr data-food="${f.id}"><td>${esc(f.name)}</td>
+      <td><input class="grams" inputmode="decimal" value="100" aria-label="Gramos de ${esc(f.name)}" style="width:80px;padding:6px 8px;text-align:right"></td>
+      <td data-k="kcal">${fmt(f.kcal, 0)}</td><td data-k="p">${fmt(f.p)}</td><td data-k="c">${fmt(f.c)}</td><td data-k="g">${fmt(f.g)}</td>
+      <td><button class="btn sm ghost" data-action="editFood">Editar</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Sin resultados.</td></tr>'}</tbody>
+  </table></div>
+  <form class="card" id="fFood"><h2 id="foodTitle">Agregar alimento</h2><input type="hidden" name="id">
+    <div class="grid">
+      <label style="grid-column:1/-1">Nombre<input name="name" required></label>
+      <label>kcal <span class="u">(100 g)</span><input name="kcal" inputmode="decimal" required></label>
+      <label>Proteínas <span class="u">(g)</span><input name="p" inputmode="decimal"></label>
+      <label>Carbohidratos <span class="u">(g)</span><input name="c" inputmode="decimal"></label>
+      <label>Grasas <span class="u">(g)</span><input name="g" inputmode="decimal"></label>
+    </div>
+    <div class="actions"><button class="btn">Guardar alimento</button><button type="reset" class="btn ghost" data-action="resetFood">Limpiar</button>
+      <button type="button" class="btn danger" data-action="delFood" hidden>Eliminar</button></div>
+  </form>`;
+}
+
+function vBackup() {
+  return `<div class="head"><div><h1>Respaldo</h1><p class="muted">Los datos se guardan solo en este equipo. Nadie más los ve, pero si se pierde o se borra el equipo, se pierden.</p></div></div>
+  <div class="card" style="display:grid;gap:12px">
+    <h2>Descargar respaldo</h2>
+    <p>Descarga un archivo con todos los pacientes, controles y alimentos. Guárdalo en tu iCloud Drive o en Archivos. Hazlo al menos una vez a la semana.</p>
+    <p class="muted">Último respaldo: ${db.lastBackup ? new Date(db.lastBackup).toLocaleString('es-CL') : 'nunca'}</p>
+    <div><button class="btn" data-action="export">Descargar respaldo</button></div>
+  </div>
+  <div class="card" style="display:grid;gap:12px">
+    <h2>Restaurar o pasar a otro equipo</h2>
+    <p>Para usar los mismos datos en el iPad y el iPhone, descarga el respaldo en uno y cárgalo en el otro. <b>Esto reemplaza los datos del equipo donde lo cargas.</b></p>
+    <label>Archivo de respaldo (.json)<input type="file" id="importFile" accept="application/json,.json"></label>
+  </div>`;
+}
+
+// ---------- enrutador ----------
+function route() {
+  const [, a, id, b, cid] = (location.hash || '#/').slice(1).split('/');
+  const p = a === 'p' ? patient(id) : null;
+  let html;
+  if (a === 'nuevo') html = vPatientForm();
+  else if (a === 'alimentos') html = vFoods();
+  else if (a === 'respaldo') html = vBackup();
+  else if (p && b === 'editar') html = vPatientForm(p);
+  else if (p && b === 'control') html = vControl(p, cid ? p.controls.find(c => c.id === cid) : null);
+  else if (p && b === 'informe') html = vReport(p);
+  else if (p) html = vPatient(p);
+  else html = vList();
+  app.innerHTML = html;
+  document.querySelectorAll('.tabs a').forEach(t => t.toggleAttribute('aria-current', t.dataset.tab === (a === 'alimentos' || a === 'respaldo' ? a : 'p')));
+  if (p && b === 'control') { const f = $('#fControl'); const upd = () => $('#live').innerHTML = liveResults(p, readControl(f)); f.addEventListener('input', upd); upd(); }
+  scrollTo(0, 0);
+}
+addEventListener('hashchange', route);
+
+// ---------- acciones ----------
+app.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'q') { ui.q = t.value; const pos = t.selectionStart; route(); const q = $('#q'); q.focus(); q.setSelectionRange(pos, pos); }
+  if (t.id === 'foodQ') { ui.foodQ = t.value; const pos = t.selectionStart; route(); const q = $('#foodQ'); q.focus(); q.setSelectionRange(pos, pos); }
+  if (t.classList.contains('grams')) {
+    const tr = t.closest('tr'), f = db.foods.find(x => x.id === tr.dataset.food), k = (num(t.value) || 0) / 100;
+    for (const key of ['kcal', 'p', 'c', 'g']) tr.querySelector(`[data-k="${key}"]`).textContent = fmt(f[key] * k, key === 'kcal' ? 0 : 1);
+  }
+});
+app.addEventListener('change', e => {
+  if (e.target.id === 'metric') { ui.metric = e.target.value; const [, , id] = location.hash.slice(1).split('/'); $('#chart').innerHTML = chart(patient(id), ui.metric); }
+  if (e.target.id === 'importFile') importBackup(e.target.files[0]);
+});
+app.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target, [, , id, , cid] = location.hash.slice(1).split('/');
+  if (f.id === 'fPatient') {
+    const v = Object.fromEntries(new FormData(f));
+    v.name = v.name.trim();
+    if (!v.name) return toast('Escribe el nombre');
+    let p = patient(id);
+    if (p) Object.assign(p, v); else { p = { id: uid(), controls: [], created: today(), ...v }; db.patients.push(p); }
+    if (save()) { toast('Paciente guardado'); location.hash = '#/p/' + p.id; }
+  }
+  if (f.id === 'fControl') {
+    const p = patient(id), c = readControl(f);
+    if (!c.date) return toast('Falta la fecha');
+    if (!c.weight || !c.height) return toast('Faltan peso y talla');
+    if (c.weight < 2 || c.weight > 400 || c.height < 40 || c.height > 250) return toast('Revisa peso (kg) y talla (cm)');
+    const old = cid && p.controls.find(x => x.id === cid);
+    if (old) Object.assign(old, c); else p.controls.push({ id: uid(), ...c });
+    if (save()) { toast('Control guardado'); location.hash = '#/p/' + p.id; }
+  }
+  if (f.id === 'fFood') {
+    const v = Object.fromEntries(new FormData(f));
+    const food = { name: v.name.trim(), kcal: num(v.kcal), p: num(v.p) || 0, c: num(v.c) || 0, g: num(v.g) || 0 };
+    if (!food.name || food.kcal == null) return toast('Falta nombre o kcal');
+    const old = db.foods.find(x => x.id === v.id);
+    if (old) Object.assign(old, food); else db.foods.push({ id: uid(), ...food });
+    if (save()) { toast('Alimento guardado'); route(); }
+  }
+});
+app.addEventListener('click', e => {
+  const a = e.target.closest('[data-action]')?.dataset.action;
+  if (!a) return;
+  const [, , id, , cid] = location.hash.slice(1).split('/');
+  if (a === 'delControl' && confirm('¿Eliminar este control? No se puede deshacer.')) {
+    const p = patient(id); p.controls = p.controls.filter(c => c.id !== cid);
+    if (save()) { toast('Control eliminado'); location.hash = '#/p/' + id; }
+  }
+  if (a === 'print') print();
+  if (a === 'export') exportBackup();
+  if (a === 'editFood') {
+    const f = db.foods.find(x => x.id === e.target.closest('tr').dataset.food), form = $('#fFood');
+    for (const k of ['id', 'name', 'kcal', 'p', 'c', 'g']) form.elements[k].value = f[k];
+    $('#foodTitle').textContent = 'Editar alimento'; form.querySelector('[data-action="delFood"]').hidden = false;
+    form.scrollIntoView({ behavior: 'smooth' }); form.elements.name.focus({ preventScroll: true });
+  }
+  if (a === 'resetFood') { $('#foodTitle').textContent = 'Agregar alimento'; $('#fFood [data-action="delFood"]').hidden = true; }
+  if (a === 'delFood') {
+    const fid = $('#fFood').elements.id.value;
+    if (confirm('¿Eliminar este alimento?')) { db.foods = db.foods.filter(x => x.id !== fid); if (save()) { toast('Alimento eliminado'); route(); } }
+  }
+});
+// eliminar paciente: desde editar, para que no quede a un toque de distancia en la ficha
+app.addEventListener('click', e => {
+  if (!e.target.matches('[data-action="delPatient"]')) return;
+  const [, , id] = location.hash.slice(1).split('/'), p = patient(id);
+  if (confirm(`¿Eliminar a ${p.name} y todos sus controles? No se puede deshacer.`)) {
+    db.patients = db.patients.filter(x => x.id !== id); if (save()) { toast('Paciente eliminado'); location.hash = '#/'; }
+  }
+});
+
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `respaldo-consulta-${today()}.json` });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  db.lastBackup = Date.now(); save(); route(); toast('Respaldo descargado');
+}
+async function importBackup(file) {
+  if (!file) return;
+  try {
+    const d = JSON.parse(await file.text());
+    if (!Array.isArray(d.patients) || !Array.isArray(d.foods)) throw 0;
+    if (!confirm(`El respaldo tiene ${d.patients.length} pacientes. ¿Reemplazar los datos de este equipo?`)) return;
+    db = d; if (save()) { toast('Respaldo cargado'); location.hash = '#/'; route(); }
+  } catch { alert('Ese archivo no es un respaldo válido de Consulta.'); }
+}
+
+route();
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
