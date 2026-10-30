@@ -112,6 +112,11 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 .mealgrid th,.mealgrid td{white-space:normal;padding:8px 4px;text-align:center}
 .mealgrid th:first-child,.mealgrid td:first-child{min-width:140px;text-align:left}
 .mealgrid input{width:52px!important}
+.suggest{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:14px;background:var(--soft);margin-bottom:16px}
+.suggest p{flex:1 1 280px;font-size:.92rem}
+.menu{font-weight:600;margin:6px 0 2px;padding:10px 14px;border-radius:12px;background:var(--soft)}
+.report-extra{display:none}
+@media print{body.with-report .report-extra{display:block;break-before:page}}
 .pair{display:flex;gap:6px}
 .pair input{flex:1;min-width:0}
 .pair select{width:auto;flex:none;padding:11px 8px}
@@ -334,7 +339,7 @@ const GOALS = [[-.2, 'Bajar grasa (−20 %)'], [-.15, 'Bajar grasa (−15 %)'], 
 function newPlan(p) {
   const prev = (p.plans || []).at(-1);
   return prev ? { ...structuredClone(prev), id: uid(), date: today() }
-    : { id: uid(), date: today(), adjust: 0, kcalManual: null, protKg: 1.6, fatPct: 25, portions: {}, meals: {}, prefer: '', avoid: '', activity: '', notes: '', showKcal: true };
+    : { id: uid(), date: today(), adjust: 0, kcalManual: null, protKg: 1.6, fatPct: 25, portions: {}, meals: {}, menu: {}, prefer: '', avoid: '', activity: '', notes: '', showKcal: true };
 }
 function targets(p, plan) {
   const c = sorted(p).at(-1), r = c ? results(p, c) : {}, w = c?.weight;
@@ -349,6 +354,110 @@ function totals(portions) {
   for (const gr of db.groups) { const n = portions?.[gr.id] || 0; for (const k in t) t[k] += n * gr[k]; }
   return t;
 }
+
+// ---------- sugerencia automática de pauta (punto de partida; Javiera la ajusta) ----------
+const SUGGEST_ADJUST = { 'Bajo peso': .15, 'Normal': 0, 'Sobrepeso': -.15, 'Obesidad': -.2, 'Obesidad I': -.2, 'Obesidad II': -.2, 'Obesidad III': -.2 };
+// g/kg de peso actual: en obesidad se usa menos para no sobrestimar la proteína
+const SUGGEST_PROT = { 'Bajo peso': 1.8, 'Normal': 1.6, 'Sobrepeso': 1.6, 'Obesidad': 1.3, 'Obesidad I': 1.3, 'Obesidad II': 1.3, 'Obesidad III': 1.3 };
+// en qué comidas suele ir cada grupo (pesos relativos)
+const SPLIT = {
+  cereales: { desayuno: 1, almuerzo: 1.5, col1: .5, col2: .5, once: 1, cena: 1 }, leguminosas: { almuerzo: 1 },
+  verdurasG: { almuerzo: 1, cena: 1 }, verdurasL: { almuerzo: 1, cena: 1 }, frutas: { col1: 1, col2: 1, once: 1 },
+  carnesBG: { almuerzo: 1, cena: 1 }, carnesAG: { desayuno: 1 },
+  lacteosAG: { desayuno: 1, col2: 1, once: .5 }, lacteosMG: { desayuno: 1, col2: 1, once: .5 }, lacteosBG: { desayuno: 1, col2: 1, once: .5 },
+  aceites: { almuerzo: 1, cena: 1 }, lipidos: { once: 1, col1: 1 }, azucares: { desayuno: 1, once: 1 }
+};
+// alimentos concretos por porción: [cantidad, singular, plural], regular (r) y económico (b), según el tipo de comida
+const CTX = { desayuno: 'pan', once: 'pan', col1: 'col', col2: 'col', almuerzo: 'plato', cena: 'plato' };
+const ITEMS = {
+  cereales: { pan: { r: [.5, 'marraqueta integral', 'marraquetas integrales'], b: [.5, 'marraqueta', 'marraquetas'] },
+    plato: { r: [.75, 'taza de arroz integral o quinoa cocida', 'tazas de arroz integral o quinoa cocida'], b: [.75, 'taza de arroz o fideos cocidos', 'tazas de arroz o fideos cocidos'] },
+    col: { r: [.5, 'taza de avena', 'tazas de avena'] } },
+  leguminosas: { plato: { r: [.75, 'taza de legumbres cocidas', 'tazas de legumbres cocidas'] } },
+  verdurasG: { plato: { r: [1, 'taza de verduras cocidas (brócoli, zapallo italiano o zanahoria)', 'tazas de verduras cocidas (brócoli, zapallo italiano o zanahoria)'], b: [1, 'taza de verduras de temporada cocidas', 'tazas de verduras de temporada cocidas'] } },
+  verdurasL: { plato: { r: [1, 'plato de ensalada (lechuga, tomate, pepino)', 'platos de ensalada (lechuga, tomate, pepino)'], b: [1, 'plato de ensalada de temporada', 'platos de ensalada de temporada'] } },
+  frutas: { col: { r: [1, 'fruta (manzana, pera, naranja o kiwi)', 'frutas (manzana, pera, naranja o kiwi)'], b: [1, 'fruta de temporada', 'frutas de temporada'] } },
+  carnesBG: { plato: { r: [50, 'g de pollo, pavo o pescado', 'g de pollo, pavo o pescado'], b: [50, 'g de pollo sin piel o jurel', 'g de pollo sin piel o jurel'] },
+    pan: { r: [2, 'rebanada de jamón de pavo', 'rebanadas de jamón de pavo'], b: [3, 'clara de huevo', 'claras de huevo'] } },
+  carnesAG: { pan: { r: [1, 'huevo', 'huevos'] },
+    plato: { r: [50, 'g de carne magra o salmón', 'g de carne magra o salmón'], b: [50, 'g de carne molida o trutro', 'g de carne molida o trutro'] } },
+  lacteosAG: { pan: { r: [1, 'taza de leche entera', 'tazas de leche entera'], b: [1, 'taza de leche entera (puede ser en polvo)', 'tazas de leche entera (puede ser en polvo)'] } },
+  lacteosMG: { pan: { r: [1, 'taza de leche semidescremada', 'tazas de leche semidescremada'] }, col: { r: [1, 'yogur', 'yogures'] } },
+  lacteosBG: { pan: { r: [1, 'taza de leche descremada', 'tazas de leche descremada'], b: [1, 'taza de leche descremada (puede ser en polvo)', 'tazas de leche descremada (puede ser en polvo)'] },
+    col: { r: [1, 'yogur descremado', 'yogures descremados'], b: [1, 'taza de yogur descremado de pote grande', 'tazas de yogur descremado de pote grande'] } },
+  aceites: { plato: { r: [4, 'cucharadita de aceite de oliva', 'cucharaditas de aceite de oliva'], b: [4, 'cucharadita de aceite vegetal', 'cucharaditas de aceite vegetal'] } },
+  lipidos: { pan: { r: [1 / 3, 'palta', 'paltas'] }, col: { r: [25, 'g de almendras o nueces', 'g de almendras o nueces'], b: [25, 'g de maní sin sal', 'g de maní sin sal'] } },
+  azucares: { pan: { r: [1, 'cucharadita de miel o mermelada', 'cucharaditas de miel o mermelada'] } }
+};
+function suggestText(p) {
+  const c = sorted(p).at(-1), r = c ? results(p, c) : null;
+  if (!r?.tdee) return 'Para que la app sugiera una pauta, el paciente necesita fecha de nacimiento y un control con peso y talla.';
+  const adj = SUGGEST_ADJUST[r.imcClass];
+  return `<b>IMC ${fmt(r.imc)}${r.imcClass ? ' · ' + r.imcClass : ''}.</b> ${adj == null ? 'Elige el objetivo a mano (menor de 18 años).' : 'Se sugiere: ' + GOALS.find(([v]) => v === adj)[1].toLowerCase() + '.'} La sugerencia arma porciones, reparto y menú; después puedes cambiar todo.`;
+}
+const half = x => Math.max(0, Math.round(x * 2) / 2);
+function suggestPortions(t) {
+  const P = { verdurasG: 2, verdurasL: 2, frutas: t.kcal < 1600 ? 2 : 3, lacteosBG: t.kcal > 2400 ? 3 : 2, carnesAG: 1 };
+  const sum = k => db.groups.reduce((s, g) => s + (P[g.id] || 0) * g[k], 0);
+  const g = id => db.groups.find(x => x.id === id);
+  P.cereales = Math.max(1, half((t.C - sum('c')) / g('cereales').c));
+  P.carnesBG = Math.max(1, half((t.P - sum('p')) / g('carnesBG').p));
+  P.lipidos = Math.min(2, Math.floor((t.G - sum('g')) / g('lipidos').g));
+  P.aceites = half((t.G - sum('g')) / g('aceites').g);
+  P.cereales = Math.max(1, P.cereales + half((t.kcal - sum('kcal')) / g('cereales').kcal)); // ajuste fino de calorías con cereales
+  return Object.fromEntries(Object.entries(P).filter(([, n]) => n > 0));
+}
+// reparte n porciones según pesos, en pasos de 1 (o de 0,5 si n tiene media porción), por mayor resto
+function allocate(n, weights) {
+  const step = Number.isInteger(n) ? 1 : .5, units = Math.round(n / step), keys = Object.keys(weights);
+  const W = keys.reduce((s, k) => s + weights[k], 0), raw = keys.map(k => units * weights[k] / W), out = raw.map(Math.floor);
+  let left = units - out.reduce((a, b) => a + b, 0);
+  raw.map((r, i) => [r - out[i], i]).sort((a, b) => b[0] - a[0]).slice(0, left).forEach(([, i]) => out[i]++);
+  return Object.fromEntries(keys.map((k, i) => [k, out[i] * step]).filter(([, v]) => v > 0));
+}
+function fq(x) {
+  const w = Math.floor(x + 1e-9), f = x - w;
+  if (f < .02) return String(w);
+  const fr = [[1 / 3, '⅓'], [2 / 3, '⅔']].find(([v]) => Math.abs(f - v) < .02);
+  if (fr) return (w || '') + fr[1];
+  const q = Math.round(x * 4) / 4, qw = Math.floor(q), qf = q - qw; // medidas caseras: al cuarto más cercano
+  return qf ? (qw || '') + { .25: '¼', .5: '½', .75: '¾' }[qf] : String(qw);
+}
+function buildMenu(plan) {
+  const menu = {};
+  for (const [m] of MEALS) {
+    const parts = Object.entries(plan.meals[m] || {}).map(([gid, n]) => {
+      const it = ITEMS[gid]; if (!it) return '';
+      const v = it[CTX[m]] || it.pan || it.plato || it.col, [q, s, pl] = plan.budget && v.b ? v.b : v.r, x = q * n;
+      return `${fq(x)} ${x <= 1 ? s : pl}`;
+    }).filter(Boolean);
+    if (parts.length) menu[m] = parts.join(' + ');
+  }
+  return menu;
+}
+function tips(adjust, budget) {
+  const t = adjust < 0
+    ? { prefer: 'Verduras en almuerzo y cena\nPreparaciones al horno, a la plancha o cocidas\nAgua como bebida principal', avoid: 'Bebidas y jugos azucarados\nFrituras y comida rápida\nPastelería, galletas dulces y snacks' }
+    : adjust > 0
+      ? { prefer: 'No saltarse comidas\nProteína en cada comida principal\nFrutos secos o palta en las colaciones', avoid: 'Reemplazar comidas por bebidas o snacks' }
+      : { prefer: 'Comer a horarios regulares\nVerduras en almuerzo y cena', avoid: 'Bebidas azucaradas\nFrituras' };
+  if (budget) t.prefer += '\nLegumbres 2 a 3 veces por semana en vez de la carne del almuerzo\nFrutas y verduras de temporada, de la feria\nArroz, avena y legumbres a granel';
+  return t;
+}
+function suggestPlan(p, plan, budget) {
+  const c = sorted(p).at(-1); if (!c) return null;
+  const cls = results(p, c).imcClass, adjust = SUGGEST_ADJUST[cls] ?? plan.adjust ?? 0;
+  const s = { ...plan, adjust, kcalManual: null, protUnit: 'gkg', protKg: SUGGEST_PROT[cls] ?? 1.6, fatUnit: 'pct', fatPct: adjust > 0 ? 30 : 25, budget };
+  const t = targets(p, s); if (!t.kcal || t.P == null) return null;
+  s.portions = suggestPortions(t);
+  s.meals = {};
+  for (const [gid, n] of Object.entries(s.portions)) for (const [m, v] of Object.entries(allocate(n, SPLIT[gid] || { almuerzo: 1 }))) (s.meals[m] ||= {})[gid] = v;
+  s.menu = buildMenu(s);
+  const tp = tips(adjust, budget); s.prefer = tp.prefer; s.avoid = tp.avoid;
+  return s;
+}
+console.assert(JSON.stringify(allocate(3, { a: 1, b: 1, c: 1 })) === '{"a":1,"b":1,"c":1}' && JSON.stringify(allocate(4.5, { x: 1, y: 2 })) === '{"x":1.5,"y":3}', 'reparto');
+console.assert(fq(.5) === '½' && fq(1.5) === '1½' && fq(2) === '2' && fq(2 / 3) === '⅔' && fq(2.625) === '2¾' && fq(.75) === '¾', 'fracciones');
 
 // ---------- gráfico de evolución (SVG) ----------
 const METRICS = {
@@ -599,6 +708,9 @@ function vPlan(p, plan) {
   return `<div class="head"><div><h1>Pauta alimentaria</h1><p class="muted">${esc(p.name)}</p></div><a class="btn ghost" href="#/p/${p.id}">← Volver</a></div>
   <form id="fPlan" style="display:grid;gap:20px">
     <section class="card"><h2>1 · Meta de calorías y macronutrientes</h2>
+      <div class="suggest"><p>${suggestText(p)}</p>
+        <div class="actions"><button type="button" class="btn" data-action="suggest" data-budget="0">Sugerir pauta regular</button>
+          <button type="button" class="btn ghost" data-action="suggest" data-budget="1">Sugerir pauta económica</button></div></div>
       <div class="grid">
         <label>Fecha<input type="date" name="date" value="${plan.date}" required></label>
         <label>Objetivo<select name="adjust">${GOALS.map(([v, l]) => `<option value="${v}" ${v == plan.adjust ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -616,7 +728,12 @@ function vPlan(p, plan) {
       <div id="tot" style="margin-top:14px"></div>
     </section>
     <section class="card"><h2>3 · Reparto por comida</h2><p class="hint" style="margin-bottom:10px">Reparte las porciones de cada grupo entre las comidas. Se aceptan medias porciones (0,5).</p><div id="meals"></div></section>
-    <section class="card"><h2>4 · Indicaciones</h2><div class="grid">
+    <section class="card"><h2>4 · Menú de ejemplo</h2>
+      <p class="hint" style="margin-bottom:10px">Lo que el paciente ve como ejemplo de cada comida. Edítalo como quieras, o rehazlo a partir del reparto.</p>
+      <div class="grid">${MEALS.map(([m, l]) => `<label style="grid-column:1/-1">${l}<textarea name="menu.${m}" style="min-height:56px" placeholder="Ej: 1 taza de leche descremada + ½ marraqueta + 1 huevo">${esc(plan.menu?.[m])}</textarea></label>`).join('')}</div>
+      <div class="actions" style="margin-top:12px"><button type="button" class="btn ghost" data-action="remenu">Rehacer menú desde el reparto</button></div>
+    </section>
+    <section class="card"><h2>5 · Indicaciones</h2><div class="grid">
       <label style="grid-column:1/-1">Preferir <span class="u">(una por línea)</span><textarea name="prefer" placeholder="Pan integral&#10;Pescado 2 veces por semana">${esc(plan.prefer)}</textarea></label>
       <label style="grid-column:1/-1">Evitar o limitar <span class="u">(una por línea)</span><textarea name="avoid" placeholder="Bebidas azucaradas&#10;Frituras">${esc(plan.avoid)}</textarea></label>
       <label style="grid-column:1/-1">Actividad física y entrenamiento<textarea name="activity" placeholder="Ej: colación PM 1 a 2 horas antes de entrenar. Después de entrenar, la once o la cena dentro de 2 horas.">${esc(plan.activity)}</textarea></label>
@@ -630,10 +747,11 @@ function vPlan(p, plan) {
 }
 
 function readPlan(form, base) {
-  const plan = { ...base, portions: {}, meals: {} };
+  const plan = { ...base, portions: {}, meals: {}, menu: {} };
   for (const [k, v] of new FormData(form)) {
     const [a, b, c] = k.split('.');
     if (a === 'portions') { const n = num(v); if (n) plan.portions[b] = n; }
+    else if (a === 'menu') { if (v.trim()) plan.menu[b] = v.trim(); }
     else if (a === 'meals') { const n = num(v); if (n) (plan.meals[b] ||= {})[c] = n; }
     else if (['date', 'prefer', 'avoid', 'activity', 'notes', 'protUnit', 'fatUnit'].includes(a)) plan[a] = v;
     else if (a !== 'showKcal' && a !== 'budget') plan[a] = num(v);
@@ -696,13 +814,15 @@ function vPlanPrint(p, plan) {
   const w = sorted(p).at(-1)?.weight;
   const lines = s => (s || '').split('\n').map(x => x.trim()).filter(Boolean);
   const list = (title, s) => lines(s).length ? `<div><h2>${title}</h2><ul class="bul">${lines(s).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
-  const meals = MEALS.filter(([m]) => Object.keys(plan.meals[m] || {}).length);
+  const meals = MEALS.filter(([m]) => Object.keys(plan.meals[m] || {}).length || plan.menu?.[m]);
+  const hasControls = (p.controls || []).length > 0;
   return `<div class="head noprint"><a class="btn ghost" href="#/p/${p.id}">← Volver</a>
-    <div class="actions"><a class="btn ghost" href="#/p/${p.id}/pauta/${plan.id}">Editar</a><button class="btn" data-action="print">Imprimir o guardar PDF</button></div></div>
+    <div class="actions"><a class="btn ghost" href="#/p/${p.id}/pauta/${plan.id}">Editar</a><button class="btn" data-action="print">Imprimir pauta</button>
+      ${hasControls ? '<button class="btn lime" data-action="printAll">Imprimir pauta + evolución</button>' : ''}</div></div>
   <article class="card" style="display:grid;gap:22px">
     <div><p class="muted">Nta. Javiera · Nutrición deportiva</p><h1>Tu pauta alimentaria</h1>
       <p>${esc(p.name)} · ${fdate(plan.date)}${plan.showKcal ? ` · ${fmt(totals(plan.portions).kcal, 0)} kcal aprox. al día` : ''}</p></div>
-    ${meals.length ? meals.map(([m, l]) => `<div class="meal"><h2>${l}</h2><ul>${Object.entries(plan.meals[m]).map(([gid, n]) => {
+    ${meals.length ? meals.map(([m, l]) => `<div class="meal"><h2>${l}</h2>${plan.menu?.[m] ? `<p class="menu">${esc(plan.menu[m])}</p>` : ''}<ul>${Object.entries(plan.meals[m] || {}).map(([gid, n]) => {
       const g = db.groups.find(x => x.id === gid);
       return g ? `<li><b>${fmt(n)} ${n <= 1 ? 'porción' : 'porciones'} de ${esc(g.name.toLowerCase())}</b><span class="muted">${esc(plan.budget && g.exBudget ? g.exBudget : g.ex)}</span></li>` : '';
     }).join('')}</ul></div>`).join('') : '<p class="muted noprint">Esta pauta aún no tiene porciones repartidas por comida.</p>'}
@@ -710,7 +830,8 @@ function vPlanPrint(p, plan) {
     ${w ? `<div><h2>Hidratación</h2><p>Alrededor de ${fmt(w * .035)} litros de agua al día, y más los días que entrenas o hace calor.</p></div>` : ''}
     ${plan.activity ? `<div><h2>Actividad física y entrenamiento</h2><p style="white-space:pre-wrap">${esc(plan.activity)}</p></div>` : ''}
     ${plan.notes ? `<div><h2>Otras indicaciones</h2><p style="white-space:pre-wrap">${esc(plan.notes)}</p></div>` : ''}
-  </article>`;
+  </article>
+  ${hasControls ? `<div class="report-extra">${vReport(p)}</div>` : ''}`;
 }
 
 // ---------- enrutador ----------
@@ -732,10 +853,15 @@ function route() {
   app.innerHTML = html;
   document.querySelectorAll('.tabs a').forEach(t => t.toggleAttribute('aria-current', t.dataset.tab === (a === 'alimentos' || a === 'respaldo' ? a : 'p')));
   if (p && b === 'control') { const f = $('#fControl'); const upd = () => $('#live').innerHTML = liveResults(p, readControl(f)); f.addEventListener('input', upd); upd(); }
+  if ($('#fPlan')) initPlanForm(p);
+  scrollTo(0, 0);
+}
+addEventListener('hashchange', route);
+
+function initPlanForm(p) {
   const fp = $('#fPlan');
-  if (fp) {
-    $('#meals').innerHTML = mealsHtml(ui.plan); updatePlanUI(p, ui.plan);
-    fp.addEventListener('input', e => {
+  $('#meals').innerHTML = mealsHtml(ui.plan); updatePlanUI(p, ui.plan);
+  fp.addEventListener('input', e => {
       const [kind, meal, gid] = (e.target.name || '').split('.');
       if (kind === 'meals') {
         // no deja repartir más porciones de las que el grupo tiene en el día
@@ -751,11 +877,8 @@ function route() {
       ui.plan = readPlan(fp, ui.plan);
       if (e.target.name?.startsWith('portions.')) $('#meals').innerHTML = mealsHtml(ui.plan); // los grupos del reparto siguen a las porciones
       updatePlanUI(p, ui.plan);
-    });
-  }
-  scrollTo(0, 0);
+  });
 }
-addEventListener('hashchange', route);
 
 // ---------- acciones ----------
 app.addEventListener('input', e => {
@@ -833,6 +956,20 @@ app.addEventListener('click', e => {
     if (save()) { toast('Pauta eliminada'); location.hash = '#/p/' + id; }
   }
   if (a === 'print') print();
+  if (a === 'printAll') { document.body.classList.add('with-report'); addEventListener('afterprint', () => document.body.classList.remove('with-report'), { once: true }); print(); }
+  if (a === 'suggest' || a === 'remenu') {
+    const p = patient(id), f = $('#fPlan');
+    ui.plan = readPlan(f, ui.plan);
+    if (a === 'remenu') { ui.plan.menu = buildMenu(ui.plan); toast('Menú rehecho desde el reparto'); }
+    else {
+      const budget = e.target.closest('[data-budget]').dataset.budget === '1';
+      const s = suggestPlan(p, ui.plan, budget);
+      if (!s) return toast('Falta la fecha de nacimiento o un control con peso y talla');
+      if (Object.keys(ui.plan.portions).length && !confirm('Esto reemplaza la meta, las porciones, el reparto, el menú y las indicaciones de preferir/evitar. ¿Seguir?')) return;
+      ui.plan = s; toast(budget ? 'Pauta económica sugerida' : 'Pauta regular sugerida');
+    }
+    const y = scrollY; app.innerHTML = vPlan(p, ui.plan); initPlanForm(p); scrollTo(0, y);
+  }
   if (a === 'export') exportBackup();
   if (a === 'editFood') {
     const f = db.foods.find(x => x.id === e.target.closest('tr').dataset.food), form = $('#fFood');
