@@ -115,8 +115,20 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 .suggest{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:14px;background:var(--soft);margin-bottom:16px}
 .suggest p{flex:1 1 280px;font-size:.92rem}
 .menu{font-weight:600;margin:6px 0 2px;padding:10px 14px;border-radius:12px;background:var(--soft)}
+.menu small{display:block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
+.menu.b{background:#F4EEDF}
+.opt2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+@media (max-width:700px){.opt2{grid-template-columns:1fr}}
+.upcoming{list-style:none;display:grid;gap:8px}
+.upcoming li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.upcoming li:last-child{border:0;padding:0}
+.upcoming a:not(.btn){text-decoration:none;display:grid}
+.upcoming small{color:var(--muted)}
 .report-extra{display:none}
-@media print{body.with-report .report-extra{display:block;break-before:page}}
+@media print{body.with-report .report-extra{display:block;break-before:page}.shop-extra{break-before:page}body.no-shop .shop-extra{display:none}}
+.printopts{display:flex;gap:12px;align-items:center;font-size:.9rem;color:var(--muted)}
+.printopts label.check{font-size:.9rem;grid-column:auto}
+.shop-extra{margin-top:4px}
 .pair{display:flex;gap:6px}
 .pair input{flex:1;min-width:0}
 .pair select{width:auto;flex:none;padding:11px 8px}
@@ -185,6 +197,18 @@ const num = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); retu
 const fmt = (n, d = 1) => n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('es-CL', { maximumFractionDigits: d, minimumFractionDigits: 0 });
 const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const fdate = s => s ? new Date(s + 'T12:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const addDays = (s, n) => { const d = new Date(s + 'T12:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const daysUntil = s => Math.round((new Date(s + 'T12:00') - new Date(today() + 'T12:00')) / 864e5);
+const longDate = s => new Date(s + 'T12:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+// link de WhatsApp con mensaje listo; acepta celulares chilenos con o sin +56
+function waLink(phone, msg) {
+  let d = String(phone || '').replace(/\D/g, '');
+  if (d.length === 9 && d[0] === '9') d = '56' + d;
+  else if (d.length === 8) d = '569' + d;
+  return d.length >= 11 ? `https://wa.me/${d}?text=${encodeURIComponent(msg)}` : null;
+}
+const reminderMsg = p => `Hola ${p.name.split(' ')[0]}, te escribe Javiera, tu nutricionista 🌱 Te recuerdo tu control del ${longDate(p.next)}. ¿Me confirmas si puedes?`;
+console.assert(waLink('+56 9 1234 5678', 'x') === 'https://wa.me/56912345678?text=x' && waLink('912345678', 'x') === 'https://wa.me/56912345678?text=x' && waLink('', 'x') === null, 'whatsapp');
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => t.hidden = true, 2200); }
 
 // ---------- datos (solo en este equipo) ----------
@@ -366,6 +390,8 @@ function BUDGET_EX() { return {
 const MEALS = [['desayuno', 'Desayuno'], ['col1', 'Colación AM'], ['almuerzo', 'Almuerzo'], ['col2', 'Colación PM / pre-entreno'], ['once', 'Once'], ['cena', 'Cena']];
 const GOALS = [[-.2, 'Bajar grasa (−20 %)'], [-.15, 'Bajar grasa (−15 %)'], [-.1, 'Bajar grasa suave (−10 %)'], [0, 'Mantener peso'], [.1, 'Ganar masa (+10 %)'], [.15, 'Ganar masa (+15 %)']];
 
+// lo que copia una plantilla (no la fecha ni el id de la pauta)
+const TPL_FIELDS = ['adjust', 'kcalManual', 'protKg', 'protUnit', 'fatPct', 'fatUnit', 'portions', 'meals', 'menu', 'menuB', 'prefer', 'avoid', 'activity', 'notes', 'showKcal', 'budget', 'units'];
 function newPlan(p) {
   const prev = (p.plans || []).at(-1);
   return prev ? { ...structuredClone(prev), id: uid(), date: today() }
@@ -423,6 +449,26 @@ const ITEMS = {
   azucares: { pan: one([1, 'cucharadita de miel o mermelada', 'cucharaditas de miel o mermelada', 5, 'miel o mermelada']) }
 };
 
+// Opción B: otros alimentos del mismo grupo, para variar (mismo formato que ITEMS)
+const ITEMS_B = {
+  cereales: { pan: { r: [2, 'rebanada de pan integral de molde', 'rebanadas de pan integral de molde', 55, 'pan integral de molde'], b: [.5, 'taza de avena', 'tazas de avena', 35, 'avena'] },
+    plato: one([1, 'papa mediana cocida', 'papas medianas cocidas', 160, 'papa cocida']),
+    col: { r: [4, 'galleta de arroz', 'galletas de arroz', 35, 'galletas de arroz'], b: [.5, 'marraqueta', 'marraquetas', 50, 'marraqueta'] } },
+  leguminosas: { plato: one([.75, 'taza de lentejas o garbanzos cocidos', 'tazas de lentejas o garbanzos cocidos', 140, 'lentejas o garbanzos cocidos']) },
+  verdurasG: { plato: { r: [1, 'taza de zapallo italiano salteado o porotos verdes', 'tazas de zapallo italiano salteado o porotos verdes', 100, 'zapallo italiano o porotos verdes'], b: [1, 'taza de zanahoria y repollo salteados', 'tazas de zanahoria y repollo salteados', 100, 'zanahoria y repollo'] } },
+  verdurasL: { plato: { r: [1, 'plato de ensalada de lechuga, apio y pimentón', 'platos de ensalada de lechuga, apio y pimentón', 100, 'ensalada de lechuga, apio y pimentón'], b: [1, 'plato de ensalada de repollo y zanahoria', 'platos de ensalada de repollo y zanahoria', 100, 'ensalada de repollo y zanahoria'] } },
+  frutas: { col: { r: [1, 'taza de frutillas, arándanos o melón', 'tazas de frutillas, arándanos o melón', 180, 'frutillas, arándanos o melón'], b: [1, 'plátano chico', 'plátanos chicos', 75, 'plátano'] } },
+  carnesBG: { plato: { r: [50, 'g de pescado blanco (merluza o reineta)', 'g de pescado blanco (merluza o reineta)', 50], b: [1 / 3, 'lata de atún o jurel en agua', 'latas de atún o jurel en agua', 50, 'atún o jurel en agua'] },
+    pan: { r: [3, 'clara de huevo', 'claras de huevo', 100, 'clara de huevo'], b: [1 / 3, 'lata de atún en agua', 'latas de atún en agua', 50, 'atún en agua'] } },
+  carnesAG: { pan: one([1, 'huevo revuelto con tomate', 'huevos revueltos con tomate', 55, 'huevo']),
+    plato: { r: [50, 'g de cerdo magro o trutro de pollo', 'g de cerdo magro o trutro de pollo', 50], b: [50, 'g de trutro de pollo', 'g de trutro de pollo', 50] } },
+  lacteosAG: { pan: one([1, 'yogur natural entero', 'yogures naturales enteros', 125, 'yogur natural entero']), col: one([1, 'taza de leche entera', 'tazas de leche entera', 200, 'leche entera', 'ml']) },
+  lacteosMG: { pan: one([1, 'yogur', 'yogures', 125, 'yogur']), col: one([1, 'taza de leche semidescremada', 'tazas de leche semidescremada', 200, 'leche semidescremada', 'ml']) },
+  lacteosBG: { pan: { r: [1, 'yogur descremado', 'yogures descremados', 125, 'yogur descremado'], b: [1, 'taza de yogur descremado de pote grande', 'tazas de yogur descremado de pote grande', 175, 'yogur descremado de pote grande'] },
+    col: { r: [1, 'taza de leche descremada', 'tazas de leche descremada', 200, 'leche descremada', 'ml'], b: [1, 'taza de leche descremada (puede ser en polvo)', 'tazas de leche descremada (puede ser en polvo)', 200, 'leche descremada (puede ser en polvo)', 'ml'] } },
+  lipidos: { pan: one([2, 'cucharada de mantequilla de maní', 'cucharadas de mantequilla de maní', 30, 'mantequilla de maní']), col: one([.5, 'palta', 'paltas', 110, 'palta']) }
+};
+
 // ---------- condiciones del paciente: alertas y cambios en el menú ----------
 const CONDS = [['embarazo', 'Embarazo'], ['lactancia', 'Lactancia'], ['diabetes', 'Diabetes o resistencia a la insulina'], ['hipertension', 'Hipertensión'],
   ['renal', 'Enfermedad renal'], ['celiaquia', 'Celiaquía'], ['lactosa', 'Intolerancia a la lactosa'], ['vegetariano', 'Vegetariano'], ['vegano', 'Vegano']];
@@ -434,8 +480,10 @@ const ALLERGY_WORDS = { mani: ['mani'], 'frutos secos': ['mani', 'almendra', 'nu
 const allergyList = p => norm(p.allergies).split(/[,;\n]|\sy\s/).map(s => s.trim()).filter(Boolean);
 const allergic = (p, key) => allergyList(p).some(a => a.includes(key) || key.includes(a));
 
-function itemsFor(p) {
+function itemsFor(p, variant = 0) {
   const it = structuredClone(ITEMS), c = p.cond || {};
+  if (variant) for (const [g, ctxs] of Object.entries(ITEMS_B)) Object.assign(it[g], structuredClone(ctxs));
+  // las condiciones y alergias se aplican después, así valen para ambas opciones
   if (c.celiaquia || allergic(p, 'gluten') || allergic(p, 'trigo')) {
     it.cereales.pan = one([2, 'rebanada de pan sin gluten', 'rebanadas de pan sin gluten', 55, 'pan sin gluten']);
     it.cereales.plato = one([.75, 'taza de arroz o quinoa cocida', 'tazas de arroz o quinoa cocida', 115, 'arroz o quinoa cocida']);
@@ -461,7 +509,10 @@ function itemsFor(p) {
   }
   if (allergic(p, 'pescado')) { it.carnesBG.plato = one([50, 'g de pollo o pavo', 'g de pollo o pavo', 50]); if (!c.vegetariano && !c.vegano) it.carnesAG.plato = one([50, 'g de carne magra', 'g de carne magra', 50]); }
   if (allergic(p, 'huevo')) { it.carnesAG.pan = one([2, 'rebanada de jamón de pavo', 'rebanadas de jamón de pavo', 50, 'jamón de pavo']); it.carnesBG.pan = it.carnesAG.pan; }
-  if (allergic(p, 'mani') || allergic(p, 'frutos secos') || allergic(p, 'nuez') || allergic(p, 'almendra')) it.lipidos.col = one([.5, 'palta', 'paltas', 110, 'palta']);
+  if (allergic(p, 'mani') || allergic(p, 'frutos secos') || allergic(p, 'nuez') || allergic(p, 'almendra')) {
+    it.lipidos.col = one([.5, 'palta', 'paltas', 110, 'palta']);
+    if (norm(it.lipidos.pan.r[1]).includes('mani')) it.lipidos.pan = one([.5, 'palta', 'paltas', 110, 'palta']);
+  }
   return it;
 }
 
@@ -481,12 +532,13 @@ function alertsFor(p, plan) {
   else if (c.vegetariano) out.push(['info', 'Vegetariano: el menú cambia las carnes por huevo, legumbres y tofu. Vigilar hierro y B12.']);
   if (p.allergies?.trim()) out.push(['alta', `Alergias o intolerancias: ${esc(p.allergies.trim())}.`]);
   if (plan) {
-    const text = norm(Object.values(plan.menu || {}).join(' ') + ' ' + (plan.prefer || ''));
-    for (const a of allergyList(p)) {
+    const text = norm([...Object.values(plan.menu || {}), ...Object.values(plan.menuB || {}), plan.prefer || ''].join(' '));
+    const original = p.allergies?.split(/[,;\n]|\sy\s/).map(s => s.trim()).filter(Boolean) || []; // mismo orden que allergyList, con tildes
+    allergyList(p).forEach((a, i) => {
       const words = Object.entries(ALLERGY_WORDS).find(([k]) => a.includes(k) || k.includes(a))?.[1] || [a];
-      const hit = words.find(w => w.length > 2 && text.includes(w));
-      if (hit) out.push(['alta', `⚠ La pauta menciona «${hit}» y el paciente tiene alergia a ${esc(a)}. Revísala.`]);
-    }
+      if (words.some(w => w.length > 2 && text.includes(w))) out.push(['alta', `⚠ La pauta tiene un alimento al que el paciente es alérgico: ${esc(original[i])}. Revisa el menú y las indicaciones.`]);
+    });
+    for (const d of dislikes(p)) if (text.includes(norm(d))) out.push(['info', `La pauta incluye «${esc(d)}», que al paciente no le gusta. Considera cambiarlo.`]);
   }
   return out;
 }
@@ -538,8 +590,8 @@ function fq(x) {
 }
 const round5 = x => x < 20 ? Math.round(x) : Math.round(x / 5) * 5;
 // units: 'ambos' (¾ taza de arroz (110 g)), 'gramos' (110 g de arroz) o 'caseras' (¾ taza de arroz)
-function buildMenu(plan, p) {
-  const items = itemsFor(p), units = plan.units || 'ambos', menu = {};
+function buildMenu(plan, p, variant = 0) {
+  const items = itemsFor(p, variant), units = plan.units || 'ambos', menu = {};
   for (const [m] of MEALS) {
     const parts = Object.entries(plan.meals[m] || {}).map(([gid, n]) => {
       const it = items[gid]; if (!it) return '';
@@ -553,6 +605,42 @@ function buildMenu(plan, p) {
   }
   return menu;
 }
+// ---------- lista de compras semanal ----------
+// Sale del reparto (no del texto editado del menú): 7 días de opción A, o 4 de A y 3 de B si hay opción B.
+// Cocidos → crudos con factores aproximados (arroz y legumbres rinden ~2,5 veces; la carne pierde ~20 % al cocinarse).
+const RAW = [[/(arroz|fideos|quinoa)/, .4, 'en crudo', true], [/(legumbres|lentejas|garbanzos)/, .4, 'secas', true], [/^(pollo|pavo|pescado|carne|cerdo|trutro)/, 1.25, 'crudo', false]]; // true: solo si viene cocido (no las galletas de arroz)
+const COUNT = /^(marraqueta|huevo|fruta|palta|yogur|plátano|clara|rebanada|galleta|lata|papa|taza de yogur)/;
+function shoppingList(plan, p) {
+  const days = Object.keys(plan.menuB || {}).length ? [[0, 4], [1, 3]] : [[0, 7]], acc = new Map();
+  for (const [variant, d] of days) {
+    const items = itemsFor(p, variant);
+    for (const [m] of MEALS) for (const [gid, n] of Object.entries(plan.meals[m] || {})) {
+      const it = items[gid]; if (!it || gid === 'verdurasL') continue; // libre consumo: va como nota aparte
+      const v = it[CTX[m]] || it.pan || it.plato || it.col, [q, s, pl, g, name, u = 'g'] = plan.budget && v.b ? v.b : v.r;
+      const label = (s.startsWith('g de') ? s.slice(5) : name).replace(/ cocid[oa]s?/, '');
+      const e = acc.get(gid + label) || { gid, label, u, amount: 0, count: 0, s, pl, cooked: /cocid/.test(name || s) };
+      e.amount += g * n * d;
+      if (COUNT.test(s)) e.count += q * n * d;
+      acc.set(gid + label, e);
+    }
+  }
+  const qty = (x, u) => u === 'ml' ? (x >= 1000 ? fmt(x / 1000, 1) + ' L' : Math.round(x / 10) * 10 + ' ml') : (x >= 1000 ? fmt(x / 1000, 1) + ' kg' : Math.round(x / 10) * 10 + ' g');
+  return db.groups.map(g => [g, [...acc.values()].filter(e => e.gid === g.id).map(e => {
+    const raw = RAW.find(([re, , , needCooked]) => re.test(e.label) && (!needCooked || e.cooked)), amount = e.amount * (raw ? raw[1] : 1), label = e.label + (raw ? ` (${raw[2]})` : '');
+    return e.count ? `${Math.ceil(e.count - .01)} ${(Math.ceil(e.count - .01) <= 1 ? e.s : e.pl).replace(/ cocid[oa]s?/, '')} (≈ ${qty(amount, e.u)})` : `${label}: ${qty(amount, e.u)}`;
+  })]).filter(([, rows]) => rows.length);
+}
+function shopHtml(plan, p) {
+  const groups = shoppingList(plan, p);
+  if (!groups.length) return '';
+  const free = Object.values(plan.meals).some(m => m.verdurasL);
+  return `<article class="card doc shop-extra"><div><p class="muted">Nta. Javiera · Nutrición deportiva</p><h1>Lista de compras semanal</h1>
+    <p class="hint">Para 7 días${Object.keys(plan.menuB || {}).length ? ' (4 con la opción A y 3 con la B)' : ''}. Cantidades aproximadas; arroz, fideos y legumbres en crudo.</p></div>
+    ${groups.map(([g, rows]) => `<div class="sec"><h2>${esc(g.name)}</h2><ul class="bul">${rows.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>`).join('')}
+    ${free ? '<div class="sec"><h2>Verduras de libre consumo</h2><ul class="bul"><li>Lechuga, tomate, pepino, apio, repollo: lo suficiente para una ensalada en almuerzo y cena.</li></ul></div>' : ''}
+    ${FOOT}</article>`;
+}
+
 function tips(adjust, budget, p) {
   const c = p.cond || {};
   const t = adjust < 0
@@ -578,8 +666,9 @@ function suggestPlan(p, plan, budget) {
   s.portions = suggestPortions(t);
   s.meals = {};
   for (const [gid, n] of Object.entries(s.portions)) for (const [m, v] of Object.entries(allocate(n, SPLIT[gid] || { almuerzo: 1 }))) (s.meals[m] ||= {})[gid] = v;
-  s.menu = buildMenu(s, p);
+  s.menu = buildMenu(s, p); s.menuB = buildMenu(s, p, 1);
   const tp = tips(adjust, budget, p); s.prefer = tp.prefer; s.avoid = tp.avoid;
+  if (!plan.activity && p.anam?.entreno) s.activity = `Entrenamiento: ${p.anam.entreno}.\nColación 1 a 2 horas antes de entrenar. Después de entrenar, la comida siguiente dentro de 2 horas.`;
   return s;
 }
 console.assert(JSON.stringify(allocate(3, { a: 1, b: 1, c: 1 })) === '{"a":1,"b":1,"c":1}' && JSON.stringify(allocate(4.5, { x: 1, y: 2 })) === '{"x":1.5,"y":3}', 'reparto');
@@ -630,8 +719,16 @@ function vList() {
     .sort((a, b) => (last(b)?.date || '').localeCompare(last(a)?.date || '') || a.name.localeCompare(b.name))
     .map(p => { const c = last(p); return `<li><a href="#/p/${p.id}"><b>${esc(p.name)}</b><span class="r num">${c ? fmt(c.weight) + ' kg' : ''}</span>
       <small>${p.birth ? ageAt(p.birth, today()) + ' años · ' : ''}${esc(p.goal || 'Sin objetivo registrado')}</small><small class="r">${c ? 'Último control ' + fdate(c.date) : 'Sin controles'}</small></a></li>`; }).join('');
+  // próximos 7 días y atrasados hasta 30 días
+  const upcoming = db.patients.filter(p => p.next && daysUntil(p.next) <= 7 && daysUntil(p.next) >= -30).sort((a, b) => a.next.localeCompare(b.next));
+  const when = n => n === 0 ? 'hoy' : n === 1 ? 'mañana' : n > 1 ? `en ${n} días` : `atrasado ${-n} día${n === -1 ? '' : 's'}`;
   return `<div class="head"><div><h1>Pacientes</h1><p class="muted">${db.patients.length} en total</p></div><a class="btn" href="#/nuevo">+ Nuevo paciente</a></div>
     ${backupBanner()}
+    ${upcoming.length ? `<section class="card"><h2>Próximos controles</h2><ul class="upcoming">${upcoming.map(p => {
+      const n = daysUntil(p.next), wa = waLink(p.phone, reminderMsg(p));
+      return `<li><a href="#/p/${p.id}"><b>${esc(p.name)}</b><small>${longDate(p.next)} · <span class="chip ${n < 0 ? 'warn' : ''}">${when(n)}</span></small></a>
+        ${wa ? `<a class="btn sm lime" href="${wa}" target="_blank" rel="noopener">Recordar por WhatsApp</a>` : '<small class="muted">Sin teléfono</small>'}</li>`;
+    }).join('')}</ul></section>` : ''}
     ${db.patients.length ? `<input id="q" class="search" type="search" placeholder="Buscar por nombre" value="${esc(ui.q)}" aria-label="Buscar paciente">
     <ul class="list">${rows || '<li class="empty">Nadie coincide con la búsqueda.</li>'}</ul>`
     : `<div class="empty">Aún no hay pacientes. Agrega el primero con «Nuevo paciente».</div>`}`;
@@ -645,7 +742,8 @@ function vPatientForm(p) {
       <label style="grid-column:1/-1">Nombre completo<input name="name" required value="${esc(v.name)}" autocomplete="off"></label>
       <label>Sexo (para las fórmulas)<select name="sex"><option value="F" ${v.sex === 'F' ? 'selected' : ''}>Femenino</option><option value="M" ${v.sex === 'M' ? 'selected' : ''}>Masculino</option></select></label>
       <label>Fecha de nacimiento<input name="birth" type="date" value="${esc(v.birth)}" max="${today()}"></label>
-      <label>Teléfono<input name="phone" type="tel" value="${esc(v.phone)}"></label>
+      <label>Celular <span class="u">(para WhatsApp)</span><input name="phone" type="tel" value="${esc(v.phone)}" placeholder="+56 9 1234 5678"></label>
+      <label>Próximo control<input name="next" type="date" value="${esc(v.next)}"></label>
       <label>Deporte / actividad<input name="sport" value="${esc(v.sport)}" placeholder="Ej: running, crossfit"></label>
       <label style="grid-column:1/-1">Objetivo<input name="goal" value="${esc(v.goal)}" placeholder="Ej: bajar grasa manteniendo masa muscular"></label>
       <fieldset style="grid-column:1/-1"><legend style="font-size:1rem;margin-bottom:4px">Condiciones</legend>
@@ -670,12 +768,17 @@ function tile(label, val, unit, prev, extra = '', lowerIsBetter = true, d = 1) {
 function vPatient(p) {
   const cs = sorted(p), c = cs.at(-1), prev = cs.at(-2);
   const r = c ? results(p, c) : null, rp = prev ? results(p, prev) : null;
-  const age = ageAt(p.birth, today());
+  const age = ageAt(p.birth, today()), wa = p.next && waLink(p.phone, reminderMsg(p));
   return `<div class="head"><div><h1>${esc(p.name)}</h1>
-      <p class="muted">${[p.sex === 'M' ? 'Masculino' : 'Femenino', age != null ? age + ' años' : null, p.sport, p.phone].filter(Boolean).map(esc).join(' · ')}</p></div>
+      <p class="muted">${[p.sex === 'M' ? 'Masculino' : 'Femenino', age != null ? age + ' años' : null, p.sport, p.phone].filter(Boolean).map(esc).join(' · ')}</p>
+      ${p.next ? `<p style="margin-top:6px">Próximo control: <b>${longDate(p.next)}</b> ${wa ? `<a class="btn sm lime" href="${wa}" target="_blank" rel="noopener">Recordar por WhatsApp</a>` : ''}</p>` : ''}</div>
     <div class="actions"><a class="btn" href="#/p/${p.id}/control">+ Nuevo control</a><a class="btn lime" href="#/p/${p.id}/pauta">+ Nueva pauta</a><a class="btn ghost" href="#/p/${p.id}/informe">Informe</a><a class="btn ghost" href="#/p/${p.id}/editar">Editar</a></div></div>
   ${alertsHtml(alertsFor(p))}
   ${p.goal || p.notes ? `<div class="card">${p.goal ? `<p><b>Objetivo:</b> ${esc(p.goal)}</p>` : ''}${p.notes ? `<p class="muted" style="margin-top:6px;white-space:pre-wrap">${esc(p.notes)}</p>` : ''}</div>` : ''}
+  <section class="card"><div class="head"><h2 style="margin:0">Primera consulta</h2><a class="btn sm ghost" href="#/p/${p.id}/anamnesis">${p.anam ? 'Ver / editar' : 'Completar'}</a></div>
+    ${p.anam ? `<dl class="res" style="margin-top:12px">${[['Motivo', p.anam.motivo], ['Entrenamiento', p.anam.entreno], ['No le gusta', p.anam.noGusta], ['Sueño / agua', [p.anam.sueno && p.anam.sueno + ' h', p.anam.agua && p.anam.agua + ' vasos'].filter(Boolean).join(' · ')]]
+      .filter(([, v]) => v).map(([k, v]) => `<div><dt>${k}</dt><dd style="font-weight:500;white-space:pre-wrap">${esc(v)}</dd></div>`).join('')}</dl>`
+      : '<p class="hint" style="margin-top:8px">Recordatorio de 24 horas, hábitos, entrenamiento y lo que no le gusta comer.</p>'}</section>
   ${c ? `<section><p class="muted" style="margin-bottom:10px">Último control: ${fdate(c.date)}${prev ? ` · comparado con ${fdate(prev.date)}` : ''}</p>
     <div class="tiles">
       ${tile('Peso', c.weight, 'kg', prev?.weight)}
@@ -716,6 +819,7 @@ function vControl(p, c) {
         ${field('', 'weight', 'Peso', 'kg', v.weight)}
         ${field('', 'height', 'Talla', 'cm', v.height)}
         <label>Actividad física<select name="activity">${ACTIVITY.map(([f, l]) => `<option value="${f}" ${f == v.activity ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        ${c ? '' : `<label>Próximo control<input name="next" type="date" value="${p.next && p.next > today() ? p.next : addDays(today(), 28)}"></label>`}
       </div></fieldset>
       <fieldset><legend>Perímetros</legend><div class="grid">${CIRC.map(([k, l]) => field('circ', k, l, 'cm', v.circ?.[k])).join('')}</div></fieldset>
       <fieldset><legend>Pliegues cutáneos</legend><p class="hint">Para el % de grasa se usan bíceps, tríceps, subescapular y cresta ilíaca. Para la Σ6 ISAK: tríceps, subescapular, supraespinal, abdominal, muslo y pantorrilla.</p>
@@ -733,7 +837,7 @@ function readControl(form) {
   for (const [k, v] of fd) {
     const [g, key] = k.split('.');
     if (key) { const n = num(v); if (n != null) c[g][key] = n; }
-    else c[k] = k === 'date' || k === 'notes' ? v : num(v);
+    else c[k] = k === 'date' || k === 'notes' || k === 'next' ? v : num(v);
   }
   return c;
 }
@@ -820,6 +924,29 @@ function vFoods() {
   </form>`;
 }
 
+// ---------- primera consulta (anamnesis) ----------
+// [clave, etiqueta, tipo: 'area' | 'text' | opciones[], ancho completo]
+const ANAM = [
+  ['Motivo y objetivos', [['motivo', 'Motivo de consulta y qué espera lograr', 'area', 1]]],
+  ['Recordatorio de 24 horas', [['r24_desayuno', 'Desayuno', 'area'], ['r24_colacion', 'Colaciones', 'area'], ['r24_almuerzo', 'Almuerzo', 'area'],
+    ['r24_once', 'Once', 'area'], ['r24_cena', 'Cena', 'area'], ['r24_extras', 'Bebidas, picoteo y otros', 'area']]],
+  ['Hábitos', [['agua', 'Agua al día (vasos)', 'text'], ['sueno', 'Horas de sueño', 'text'],
+    ['alcohol', 'Alcohol', ['No', 'Ocasional', 'Fines de semana', 'Diario']], ['tabaco', 'Tabaco', ['No', 'Sí']],
+    ['digestion', 'Tránsito intestinal', ['Normal', 'Estreñimiento', 'Diarrea', 'Variable']], ['cocina', '¿Quién cocina? ¿Come fuera?', 'text'],
+    ['entreno', 'Entrenamiento: tipo, días y horario', 'text', 1], ['suplementos', 'Suplementos', 'text'], ['medicamentos', 'Medicamentos', 'text']]],
+  ['Gustos', [['favoritos', 'Alimentos favoritos', 'text', 1], ['noGusta', 'Alimentos que NO le gustan (separados por coma)', 'text', 1]]]
+];
+function vAnam(p) {
+  const a = p.anam || {};
+  const input = ([k, l, t, full]) => `<label${full || t === 'area' ? ' style="grid-column:1/-1"' : ''}>${l}${
+    Array.isArray(t) ? `<select name="${k}"><option value="">—</option>${t.map(o => `<option ${a[k] === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`
+    : t === 'area' ? `<textarea name="${k}" style="min-height:56px">${esc(a[k])}</textarea>` : `<input name="${k}" value="${esc(a[k])}">`}</label>`;
+  return `<div class="head"><div><h1>Primera consulta</h1><p class="muted">${esc(p.name)}</p></div><a class="btn ghost" href="#/p/${p.id}">← Volver</a></div>
+  <form class="card" id="fAnam">${ANAM.map(([title, fields]) => `<fieldset><legend>${title}</legend><div class="grid">${fields.map(input).join('')}</div></fieldset>`).join('')}
+    <div class="actions"><button class="btn">Guardar</button><a class="btn ghost" href="#/p/${p.id}">Cancelar</a></div></form>`;
+}
+const dislikes = p => (p.anam?.noGusta || '').split(/[,;\n]|\sy\s/).map(s => s.trim()).filter(s => s.length > 2);
+
 function vBackup() {
   return `<div class="head"><div><h1>Respaldo</h1><p class="muted">Los datos se guardan solo en este equipo. Nadie más los ve, pero si se pierde o se borra el equipo, se pierden.</p></div></div>
   <div class="card" style="display:grid;gap:12px">
@@ -829,8 +956,17 @@ function vBackup() {
     <div><button class="btn" data-action="export">Descargar respaldo</button></div>
   </div>
   <div class="card" style="display:grid;gap:12px">
-    <h2>Restaurar o pasar a otro equipo</h2>
-    <p>Para usar los mismos datos en el iPad y el iPhone, descarga el respaldo en uno y cárgalo en el otro. <b>Esto reemplaza los datos del equipo donde lo cargas.</b></p>
+    <h2>Pasar los datos al iPad o al iPhone</h2>
+    <ol style="margin-left:20px;display:grid;gap:4px">
+      <li>En el equipo con los datos más nuevos, toca <b>Enviar a otro equipo</b> y elige <b>AirDrop</b> hacia tu otro equipo (o «Guardar en Archivos»).</li>
+      <li>En el otro equipo, abre esta app → Respaldo → <b>Archivo de respaldo</b> y elige el archivo recibido.</li>
+    </ol>
+    <p class="alert alta" style="margin:0">El archivo tiene datos de salud de tus pacientes: envíalo solo a tus propios equipos, nunca a un chat con otra persona.</p>
+    <div><button class="btn lime" data-action="shareBackup">Enviar a otro equipo</button></div>
+  </div>
+  <div class="card" style="display:grid;gap:12px">
+    <h2>Restaurar o cargar un respaldo</h2>
+    <p><b>Esto reemplaza los datos de este equipo</b> por los del archivo.</p>
     <label>Archivo de respaldo (.json)<input type="file" id="importFile" accept="application/json,.json"></label>
   </div>`;
 }
@@ -840,6 +976,13 @@ function vPlan(p, plan) {
   return `<div class="head"><div><h1>Pauta alimentaria</h1><p class="muted">${esc(p.name)}</p></div><a class="btn ghost" href="#/p/${p.id}">← Volver</a></div>
   <form id="fPlan" style="display:grid;gap:20px">
     <div id="planAlerts"></div>
+    <section class="card"><h2>Plantillas</h2>
+      <div class="actions" style="align-items:center">
+        ${db.templates?.length ? `<select id="tplSel" aria-label="Plantilla" style="width:auto;max-width:100%">${db.templates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select>
+          <button type="button" class="btn ghost sm" data-action="tplUse">Usar plantilla</button><button type="button" class="btn danger sm" data-action="tplDel">Eliminar plantilla</button>`
+        : '<span class="hint">Guarda una pauta como plantilla para usarla con otros pacientes.</span>'}
+        <button type="button" class="btn sm" data-action="tplSave">Guardar esta pauta como plantilla</button>
+      </div></section>
     <section class="card"><h2>1 · Meta de calorías y macronutrientes</h2>
       <div class="suggest"><p>${suggestText(p)}</p>
         <div class="actions"><button type="button" class="btn" data-action="suggest" data-budget="0">Sugerir pauta regular</button>
@@ -865,7 +1008,9 @@ function vPlan(p, plan) {
       <p class="hint" style="margin-bottom:10px">Lo que el paciente ve como ejemplo de cada comida. Edítalo como quieras, o rehazlo a partir del reparto.</p>
       <label style="margin-bottom:12px;max-width:360px">Cantidades<select name="units">
         ${[['ambos', 'Medidas caseras y gramos'], ['gramos', 'Solo gramos'], ['caseras', 'Solo medidas caseras']].map(([v, l]) => `<option value="${v}" ${(plan.units || 'ambos') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-      <div class="grid">${MEALS.map(([m, l]) => `<label style="grid-column:1/-1">${l}<textarea name="menu.${m}" style="min-height:56px" placeholder="Ej: 1 taza de leche descremada + ½ marraqueta + 1 huevo">${esc(plan.menu?.[m])}</textarea></label>`).join('')}</div>
+      <div style="display:grid;gap:14px">${MEALS.map(([m, l]) => `<div><b>${l}</b><div class="opt2">
+        <label>Opción A<textarea name="menu.${m}" style="min-height:64px" placeholder="Ej: 1 taza de leche descremada + ½ marraqueta + 1 huevo">${esc(plan.menu?.[m])}</textarea></label>
+        <label>Opción B <span class="u">(opcional, para variar)</span><textarea name="menuB.${m}" style="min-height:64px">${esc(plan.menuB?.[m])}</textarea></label></div></div>`).join('')}</div>
       <div class="actions" style="margin-top:12px"><button type="button" class="btn ghost" data-action="remenu">Rehacer menú desde el reparto</button></div>
     </section>
     <section class="card"><h2>5 · Indicaciones</h2><div class="grid">
@@ -882,11 +1027,11 @@ function vPlan(p, plan) {
 }
 
 function readPlan(form, base) {
-  const plan = { ...base, portions: {}, meals: {}, menu: {} };
+  const plan = { ...base, portions: {}, meals: {}, menu: {}, menuB: {} };
   for (const [k, v] of new FormData(form)) {
     const [a, b, c] = k.split('.');
     if (a === 'portions') { const n = num(v); if (n) plan.portions[b] = n; }
-    else if (a === 'menu') { if (v.trim()) plan.menu[b] = v.trim(); }
+    else if (a === 'menu' || a === 'menuB') { if (v.trim()) plan[a][b] = v.trim(); }
     else if (a === 'meals') { const n = num(v); if (n) (plan.meals[b] ||= {})[c] = n; }
     else if (['date', 'prefer', 'avoid', 'activity', 'notes', 'protUnit', 'fatUnit', 'units'].includes(a)) plan[a] = v;
     else if (a !== 'showKcal' && a !== 'budget') plan[a] = num(v);
@@ -950,18 +1095,21 @@ function vPlanPrint(p, plan) {
   const w = sorted(p).at(-1)?.weight;
   const lines = s => (s || '').split('\n').map(x => x.trim()).filter(Boolean);
   const list = (title, s) => lines(s).length ? `<div class="sec"><h2>${title}</h2><ul class="bul">${lines(s).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
-  const meals = MEALS.filter(([m]) => Object.keys(plan.meals[m] || {}).length || plan.menu?.[m]);
+  const meals = MEALS.filter(([m]) => Object.keys(plan.meals[m] || {}).length || plan.menu?.[m] || plan.menuB?.[m]);
   const hasControls = (p.controls || []).length > 0;
   const usedGroups = db.groups.filter(g => MEALS.some(([m]) => plan.meals[m]?.[g.id]));
   return `<div class="head noprint"><a class="btn ghost" href="#/p/${p.id}">← Volver</a>
-    <div class="actions"><a class="btn ghost" href="#/p/${p.id}/pauta/${plan.id}">Editar</a><button class="btn" data-action="print">Imprimir pauta</button>
-      ${hasControls ? '<button class="btn lime" data-action="printAll">Imprimir pauta + evolución</button>' : ''}</div></div>
+    <div class="actions" style="align-items:center"><a class="btn ghost" href="#/p/${p.id}/pauta/${plan.id}">Editar</a>
+      <span class="printopts">Incluir: <label class="check"><input type="checkbox" id="incShop" checked> lista de compras</label>
+        ${hasControls ? '<label class="check"><input type="checkbox" id="incRep"> evolución</label>' : ''}</span>
+      <button class="btn" data-action="printSel">Imprimir o guardar PDF</button></div></div>
   <article class="card doc">
     <div><p class="muted">Nta. Javiera · Nutrición deportiva</p><h1>Tu pauta alimentaria</h1>
       <p>${esc(p.name)} · ${fdate(plan.date)}${plan.showKcal ? ` · ${fmt(totals(plan.portions).kcal, 0)} kcal aprox. al día` : ''}</p></div>
     ${meals.length ? meals.map(([m, l]) => {
       const por = Object.entries(plan.meals[m] || {}).map(([gid, n]) => { const g = db.groups.find(x => x.id === gid); return g ? `${fmt(n)} ${n <= 1 ? 'porción' : 'porciones'} de ${esc(g.name.toLowerCase())}` : ''; }).filter(Boolean).join(' · ');
-      return `<div class="meal"><h2>${l}</h2>${plan.menu?.[m] ? `<p class="menu">${esc(plan.menu[m])}</p>` : ''}${por ? `<p class="por">${por}</p>` : ''}</div>`;
+      const A = plan.menu?.[m], B = plan.menuB?.[m];
+      return `<div class="meal"><h2>${l}</h2>${A ? `<p class="menu">${B ? '<small>Opción A</small>' : ''}${esc(A)}</p>` : ''}${B ? `<p class="menu b"><small>Opción B</small>${esc(B)}</p>` : ''}${por ? `<p class="por">${por}</p>` : ''}</div>`;
     }).join('') : '<p class="muted noprint">Esta pauta aún no tiene porciones repartidas por comida.</p>'}
     ${usedGroups.length ? `<div><div class="eqhead"><h2>Equivalencias: qué cuenta como 1 porción</h2><p class="hint">Puedes cambiar un alimento por otro del mismo grupo.</p></div><ul class="eq">${usedGroups.map(g =>
       `<li><b>${esc(g.name)}</b><span>${esc(plan.budget && g.exBudget ? g.exBudget : g.ex)}</span></li>`).join('')}</ul></div>` : ''}
@@ -971,6 +1119,7 @@ function vPlanPrint(p, plan) {
     ${plan.notes ? `<div class="sec"><h2>Otras indicaciones</h2><p style="white-space:pre-wrap">${esc(plan.notes)}</p></div>` : ''}
     ${FOOT}
   </article>
+  ${shopHtml(plan, p)}
   ${hasControls ? `<div class="report-extra">${vReport(p)}</div>` : ''}`;
 }
 
@@ -986,6 +1135,7 @@ function route() {
   else if (p && b === 'editar') html = vPatientForm(p);
   else if (p && b === 'control') html = vControl(p, cid ? p.controls.find(c => c.id === cid) : null);
   else if (p && b === 'informe') html = vReport(p);
+  else if (p && b === 'anamnesis') html = vAnam(p);
   else if (plan && sub === 'ver') html = vPlanPrint(p, plan);
   else if (p && b === 'pauta') { ui.plan = plan ? structuredClone(plan) : newPlan(p); html = vPlan(p, ui.plan); }
   else if (p) html = vPatient(p);
@@ -1017,8 +1167,8 @@ function initPlanForm(p) {
       ui.plan = readPlan(fp, ui.plan);
       if (e.target.name?.startsWith('portions.')) $('#meals').innerHTML = mealsHtml(ui.plan); // los grupos del reparto siguen a las porciones
       if (e.target.name === 'units' || e.target.name === 'budget') { // el menú cambia de formato o de alimentos
-        ui.plan.menu = buildMenu(ui.plan, p);
-        for (const [m] of MEALS) fp.elements['menu.' + m].value = ui.plan.menu[m] || '';
+        ui.plan.menu = buildMenu(ui.plan, p); ui.plan.menuB = buildMenu(ui.plan, p, 1);
+        for (const [m] of MEALS) { fp.elements['menu.' + m].value = ui.plan.menu[m] || ''; fp.elements['menuB.' + m].value = ui.plan.menuB[m] || ''; }
         toast('Menú actualizado');
       }
       updatePlanUI(p, ui.plan);
@@ -1052,12 +1202,18 @@ app.addEventListener('submit', e => {
     if (p) Object.assign(p, v); else { p = { id: uid(), controls: [], created: today(), ...v }; db.patients.push(p); }
     if (save()) { toast('Paciente guardado'); location.hash = '#/p/' + p.id; }
   }
+  if (f.id === 'fAnam') {
+    const p = patient(id);
+    p.anam = Object.fromEntries([...new FormData(f)].map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
+    if (save()) { toast('Primera consulta guardada'); location.hash = '#/p/' + p.id; }
+  }
   if (f.id === 'fControl') {
     const p = patient(id), c = readControl(f);
     if (!c.date) return toast('Falta la fecha');
     if (!c.weight || !c.height) return toast('Faltan peso y talla');
     if (c.weight < 2 || c.weight > 400 || c.height < 40 || c.height > 250) return toast('Revisa peso (kg) y talla (cm)');
     const old = cid && p.controls.find(x => x.id === cid);
+    if ('next' in c) { p.next = c.next; delete c.next; } // el próximo control es del paciente, no del control
     if (old) Object.assign(old, c); else p.controls.push({ id: uid(), ...c });
     if (save()) { toast('Control guardado'); location.hash = '#/p/' + p.id; }
   }
@@ -1103,11 +1259,33 @@ app.addEventListener('click', e => {
     if (save()) { toast('Pauta eliminada'); location.hash = '#/p/' + id; }
   }
   if (a === 'print') print();
-  if (a === 'printAll') { document.body.classList.add('with-report'); addEventListener('afterprint', () => document.body.classList.remove('with-report'), { once: true }); print(); }
+  if (a === 'printSel') {
+    document.body.classList.toggle('no-shop', !$('#incShop')?.checked);
+    document.body.classList.toggle('with-report', !!$('#incRep')?.checked);
+    addEventListener('afterprint', () => document.body.classList.remove('no-shop', 'with-report'), { once: true });
+    print();
+  }
+  if (a === 'tplSave' || a === 'tplUse' || a === 'tplDel') {
+    const p = patient(id), f = $('#fPlan'), t = db.templates?.find(x => x.id === $('#tplSel')?.value);
+    ui.plan = readPlan(f, ui.plan);
+    if (a === 'tplSave') {
+      const name = prompt('Nombre de la plantilla', `${fmt(totals(ui.plan.portions).kcal, 0)} kcal${ui.plan.budget ? ' económica' : ''}`)?.trim();
+      if (!name) return;
+      (db.templates ||= []).push({ id: uid(), name, ...structuredClone(Object.fromEntries(TPL_FIELDS.map(k => [k, ui.plan[k]]))) });
+      if (save()) toast('Plantilla guardada');
+    }
+    if (a === 'tplUse' && t) {
+      if (Object.keys(ui.plan.portions).length && !confirm(`Esto reemplaza esta pauta por la plantilla «${t.name}». ¿Seguir?`)) return;
+      Object.assign(ui.plan, structuredClone(Object.fromEntries(TPL_FIELDS.map(k => [k, t[k]]))));
+      toast('Plantilla aplicada: revisa la meta y las alertas');
+    }
+    if (a === 'tplDel' && t && confirm(`¿Eliminar la plantilla «${t.name}»?`)) { db.templates = db.templates.filter(x => x !== t); if (save()) toast('Plantilla eliminada'); }
+    const y = scrollY; app.innerHTML = vPlan(p, ui.plan); initPlanForm(p); scrollTo(0, y);
+  }
   if (a === 'suggest' || a === 'remenu') {
     const p = patient(id), f = $('#fPlan');
     ui.plan = readPlan(f, ui.plan);
-    if (a === 'remenu') { ui.plan.menu = buildMenu(ui.plan, p); toast('Menú rehecho desde el reparto'); }
+    if (a === 'remenu') { ui.plan.menu = buildMenu(ui.plan, p); ui.plan.menuB = buildMenu(ui.plan, p, 1); toast('Menú rehecho desde el reparto'); }
     else {
       const budget = e.target.closest('[data-budget]').dataset.budget === '1';
       const s = suggestPlan(p, ui.plan, budget);
@@ -1118,6 +1296,7 @@ app.addEventListener('click', e => {
     const y = scrollY; app.innerHTML = vPlan(p, ui.plan); initPlanForm(p); scrollTo(0, y);
   }
   if (a === 'export') exportBackup();
+  if (a === 'shareBackup') shareBackup();
   if (a === 'editFood') {
     const f = db.foods.find(x => x.id === e.target.closest('tr').dataset.food), form = $('#fFood');
     for (const k of ['id', 'name', 'kcal', 'p', 'c', 'g']) form.elements[k].value = f[k];
@@ -1144,6 +1323,15 @@ function exportBackup() {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `respaldo-consulta-${today()}.json` });
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   db.lastBackup = Date.now(); save(); route(); toast('Respaldo descargado');
+}
+// hoja de compartir del sistema (AirDrop, Archivos…); si el navegador no la tiene, descarga normal
+async function shareBackup() {
+  const file = new File([JSON.stringify(db)], `respaldo-consulta-${today()}.json`, { type: 'application/json' });
+  if (!navigator.canShare?.({ files: [file] })) return exportBackup();
+  try {
+    await navigator.share({ files: [file], title: 'Respaldo Consulta' });
+    db.lastBackup = Date.now(); save(); route(); toast('Respaldo enviado');
+  } catch (err) { if (err.name !== 'AbortError') exportBackup(); }
 }
 async function importBackup(file) {
   if (!file) return;
